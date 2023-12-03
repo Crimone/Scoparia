@@ -1,0 +1,4 @@
+beautifulsoup4
+PyYAML
+Requests
+urllib3
