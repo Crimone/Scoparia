@@ -1,0 +1,61 @@
+name: Notify
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --no-dev
+
+      - name: Run notification cycle
+        env:
+          WIKIDOT_USERNAME: ${{ secrets.WIKIDOT_USERNAME }}
+          WIKIDOT_PASSWORD: ${{ secrets.WIKIDOT_PASSWORD }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          RSS_SITE_URLS: ${{ vars.RSS_SITE_URLS }}
+          USERS_JSON: ${{ secrets.USERS_JSON }}
+          LAST_RSS_CHECK: ${{ vars.LAST_RSS_CHECK }}
+          O365_TOKEN: ${{ secrets.O365_TOKEN }}
+          O365_CLIENT_ID: ${{ secrets.O365_CLIENT_ID }}
+          O365_CLIENT_SECRET: ${{ secrets.O365_CLIENT_SECRET }}
+        run: uv run --no-dev scoparia
+
+      - name: Update LAST_RSS_CHECK variable
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.UPDATE_VARS_SECRETS_TOKEN_ACTION }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -n "$LAST_RSS_CHECK" ]; then
+            echo "Updating LAST_RSS_CHECK to: $LAST_RSS_CHECK"
+            gh variable set LAST_RSS_CHECK --body "$LAST_RSS_CHECK" --repo "$REPO"
+          else
+            echo "LAST_RSS_CHECK not set, skipping update"
+          fi
+
+      - name: Update O365_TOKEN secret
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.UPDATE_VARS_SECRETS_TOKEN_ACTION }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -n "$O365_TOKEN" ]; then
+            echo "Updating O365_TOKEN secret"
+            gh secret set O365_TOKEN --body "$O365_TOKEN" --repo "$REPO"
+          else
+            echo "O365_TOKEN not set, skipping update"
+          fi
