@@ -1482,7 +1482,9 @@ class Client:
         url = f"{site_url}/ajax-module-connector.php"
 
         body_copy = body.copy()
-        body_copy["wikidot_token7"] = 123456
+        # Get wikidot_token7 from cookie
+        token = self.header.cookie.get("wikidot_token7", 123456)
+        body_copy["wikidot_token7"] = token
         logger.debug("Ajax Request: %s -> %s", url, body_copy)
 
         async with self._client.post(
@@ -1790,6 +1792,78 @@ class Client:
                 e,
                 exc_info=True,
             )
+            return False
+
+    async def delete_page(self, site_url: str, fullname: str) -> bool:
+        """Delete a page using Ajax Module Connector.
+
+        Parameters
+        ----------
+        site_url : str
+            Site URL where the page belongs
+        fullname : str
+            Page fullname to delete
+
+        Returns
+        -------
+        bool
+            True if deletion was successful, False otherwise
+
+        Raises
+        ------
+        Exception
+            If the ajax request fails or page cannot be found
+        """
+        try:
+            # Access the page with norender/noredirect to get page ID
+            page_url = f"{site_url}/{fullname}/norender/true/noredirect/true"
+
+            async with self._client.get(
+                page_url, headers=self.header.get_header()
+            ) as response:
+                response.raise_for_status()
+                html_content = await response.text()
+
+                # Update cookies from response
+                for cookie_name, cookie in response.cookies.items():
+                    self.header.set_cookie(cookie_name, cookie.value)
+                    logger.debug("Updated cookie %s: %s", cookie_name, cookie.value)
+
+            # Extract page ID directly from HTML content
+            page_id_match = re.search(
+                r"WIKIREQUEST\.info\.pageId = (\d+);", html_content
+            )
+            if page_id_match is None:
+                logger.warning("Page ID not found for %s", fullname)
+                return False
+
+            page_id = int(page_id_match.group(1))
+
+            # Delete the page using Ajax
+            response = await self.ajax(
+                {
+                    "action": "WikiPageAction",
+                    "event": "deletePage",
+                    "page_id": str(page_id),
+                    "moduleName": "Empty",
+                },
+                site_url,
+            )
+
+            # Check if the response indicates success
+            if response.get("status") == "ok":
+                logger.info("Successfully deleted page %s (ID: %s)", fullname, page_id)
+                return True
+            else:
+                logger.warning(
+                    "Failed to delete page %s (ID: %s): %s",
+                    fullname,
+                    page_id,
+                    response.get("message", "Unknown error"),
+                )
+                return False
+        except Exception as e:
+            logger.error("Error deleting page %s: %s", fullname, e, exc_info=True)
             return False
 
 
@@ -2115,12 +2189,30 @@ async def sync_user_configs_from_wiki(
                 continue
 
             if created_by_user.id is None or created_by_user.id != page_name_id:
-                logger.debug(
+                logger.warning(
                     "Page %s created by user ID %s, does not match page name "
-                    "(user ID), skipping",
+                    "(user ID), attempting to delete page",
                     page_name,
                     created_by_user.id,
                 )
+
+                # Delete the page using constructed fullname
+                try:
+                    fullname = f"{user_config_category}:{page_name}"
+                    client = get_client()
+                    success = await client.delete_page(config_wiki_url, fullname)
+                    if success:
+                        logger.info("Successfully deleted page %s", fullname)
+                    else:
+                        logger.error("Failed to delete page %s", fullname)
+                except Exception as e:
+                    logger.error(
+                        "Error during page deletion for %s: %s",
+                        page_name,
+                        e,
+                        exc_info=True,
+                    )
+
                 continue
 
             # Get username and userid from created_by_user
