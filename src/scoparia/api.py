@@ -1437,7 +1437,10 @@ class Client:
             attempts=10,
             start_timeout=0.4,
             statuses={429, 500, 502, 503, 504},
-            exceptions={ServerDisconnectedError},
+            exceptions={
+                ServerDisconnectedError,
+                TimeoutError,
+            },
         )
         self._client: RetryClient = RetryClient(
             client_session=base_session, retry_options=retry_options
