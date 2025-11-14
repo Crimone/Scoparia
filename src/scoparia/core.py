@@ -313,9 +313,7 @@ class ScopariaCore:
             logger.warning("Notification for %s has no posts", user_info.username)
             return
 
-        # Create Apprise instance and add URLs
-        servers = apprise.AppriseConfig(user_info.apprise_urls)
-        apobj = apprise.Apprise(servers=servers)
+        apobj = apprise.Apprise(user_info.apprise_urls) # type: ignore[arg-type]
 
         # Send notification to each service with appropriate format
         try:
