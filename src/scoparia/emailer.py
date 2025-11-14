@@ -3,6 +3,7 @@
 import base64
 import os
 
+import msgspec
 from O365 import Account, EnvTokenBackend, MSGraphProtocol
 
 from .github_storage import set_github_variable
@@ -14,6 +15,25 @@ class GitHubActionTokenBackend(EnvTokenBackend):
     This backend extends EnvTokenBackend to automatically persist token updates
     to GitHub Actions environment variables using set_github_variable.
     """
+
+    def serialize(self) -> bytes | str:
+        """Serialize the current cache state into a single-line string."""
+        with self._lock:
+            self._has_state_changed = False
+            token_str = msgspec.json.encode(self._cache).decode("utf-8")
+            if self.cryptography_manager is not None:
+                token_str = self.cryptography_manager.encrypt(token_str)
+            return token_str
+
+    def deserialize(self, token_cache_state: bytes | str) -> dict:
+        """Deserialize the cache from a state previously obtained by serialize()"""
+        with self._lock:
+            self._has_state_changed = False
+            if self.cryptography_manager is not None and isinstance(
+                token_cache_state, bytes
+            ):
+                token_cache_state = self.cryptography_manager.decrypt(token_cache_state)
+            return msgspec.json.decode(token_cache_state) if token_cache_state else {}
 
     def save_token(self, force: bool = False) -> bool:
         """Save the token and update GitHub Actions environment variable.
