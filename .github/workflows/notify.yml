@@ -3,6 +3,10 @@ name: Notify
 on:
   workflow_dispatch:
 
+concurrency:
+  group: notify-workflow
+  cancel-in-progress: false
+
 jobs:
   notify:
     runs-on: ubuntu-latest
@@ -26,6 +30,8 @@ jobs:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           RSS_SITE_URLS: ${{ vars.RSS_SITE_URLS }}
           USERS_JSON: ${{ secrets.USERS_JSON }}
+          CONFIG_WIKI_URL: ${{ vars.CONFIG_WIKI_URL }}
+          USER_CONFIG_CATEGORY: ${{ vars.USER_CONFIG_CATEGORY }}
           LAST_RSS_CHECK: ${{ vars.LAST_RSS_CHECK }}
           O365_TOKEN: ${{ secrets.O365_TOKEN }}
           O365_CLIENT_ID: ${{ secrets.O365_CLIENT_ID }}

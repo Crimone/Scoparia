@@ -70,8 +70,8 @@ class ScopariaCore:
         """
         logger.info("Starting user configs synchronization...")
 
-        config_wiki_url = os.getenv("CONFIG_WIKI_URL", "https://scoparia.wikidot.com")
-        user_config_category = os.getenv("USER_CONFIG_CATEGORY", "secret-notify")
+        config_wiki_url = os.getenv("CONFIG_WIKI_URL")
+        user_config_category = os.getenv("USER_CONFIG_CATEGORY")
 
         if not config_wiki_url or not user_config_category:
             logger.warning(
