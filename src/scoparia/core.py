@@ -26,6 +26,8 @@ from .formatter import generate_formatter
 from .github_storage import set_github_variable
 from .mongodb import get_mongodb
 
+UNTITLED_POST_TITLE = "(untitled post)"
+
 
 class ScopariaCore:
     """Main Scoparia core class for RSS monitoring and notifications."""
@@ -283,7 +285,7 @@ class ScopariaCore:
                 Link(text=thread.title, url=f"{site_url}/forum/t-{thread.id}"),
             ] + [
                 Link(
-                    text=parent.title,
+                    text=parent.title if parent.title else UNTITLED_POST_TITLE,
                     url=f"{site_url}/forum/t-{parent.thread_id}#post-{parent.id}",
                 )
                 for parent in target_post.parents
@@ -313,7 +315,7 @@ class ScopariaCore:
             logger.warning("Notification for %s has no posts", user_info.username)
             return
 
-        apobj = apprise.Apprise(user_info.apprise_urls) # type: ignore[arg-type]
+        apobj = apprise.Apprise(user_info.apprise_urls)  # type: ignore[arg-type]
 
         # Send notification to each service with appropriate format
         try:
