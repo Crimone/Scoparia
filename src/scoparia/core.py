@@ -288,7 +288,7 @@ class ScopariaCore:
                     text=parent.title if parent.title else UNTITLED_POST_TITLE,
                     url=f"{site_url}/forum/t-{parent.thread_id}#post-{parent.id}",
                 )
-                for parent in target_post.parents
+                for parent in reversed(target_post.parents)
             ]
 
             # Add post to notification list for each user
