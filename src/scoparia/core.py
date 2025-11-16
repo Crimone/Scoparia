@@ -380,6 +380,11 @@ class ScopariaCore:
             # always trigger notifications regardless of blacklist settings
             self._check_mentions(target_post, users, users_to_notify)
 
+            # Remove the post author from notification list
+            # Users should not receive notifications for their own posts
+            if target_post.created_by.id is not None:
+                users_to_notify.discard(target_post.created_by.id)
+
             # Add post to notification list for each user
             for userid in users_to_notify:
                 self.all_user_notifications[userid].append(post)
