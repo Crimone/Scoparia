@@ -89,6 +89,15 @@ class UserInfo(msgspec.Struct):
         Whether to enable email notifications. Defaults to True
     enable_apprise : bool
         Whether to enable Apprise notifications. Defaults to True
+    subscriptions : set[str]
+        Set of post URLs to subscribe to. When a new post's parent matches
+        any URL in this set, send notification. Defaults to empty set.
+        Example: {"https://scp-wiki-cn.wikidot.com/forum/t-123/#post-456"}
+    unsubscriptions : set[str]
+        Blacklist of post URLs. If a notification would normally be sent but the
+        post's parent matches any URL in this set, remove that user from
+        the notification list. Defaults to empty set.
+        Example: {"https://scp-wiki-cn.wikidot.com/forum/t-123/#post-456"}
     """
 
     userid: int
@@ -100,6 +109,8 @@ class UserInfo(msgspec.Struct):
     enable_wikidot_pm: bool = True
     enable_email: bool = True
     enable_apprise: bool = True
+    subscriptions: set[str] = msgspec.field(default_factory=set)
+    unsubscriptions: set[str] = msgspec.field(default_factory=set)
 
 
 class ScopariaConfig(msgspec.Struct):

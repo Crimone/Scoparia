@@ -157,6 +157,87 @@ class ScopariaCore:
             except Exception as e:
                 logger.debug("Failed to parse mentioned user element: %s", e)
 
+    async def _check_subscriptions(
+        self,
+        parent_links: list[Link],
+        users: dict[int, UserInfo],
+        users_to_notify: set[int],
+    ) -> None:
+        """Check subscriptions and add users to notification list.
+
+        If any parent post URL matches a user's subscription list, add that user
+        to the notification list.
+
+        Args:
+            parent_links: List of parent Link objects to check against
+            users: Dictionary of monitored users
+            users_to_notify: Set to add notified users to
+        """
+        # Extract normalized URLs from parent links
+        parent_urls = {
+            link.url.removeprefix("https://").removeprefix("http://")
+            for link in parent_links[1:]  # Skip first link (category)
+        }
+
+        if not parent_urls:
+            return
+
+        cfg = get_config()
+        if cfg.mongodb_uri is not None:
+            # Database mode: query MongoDB for subscribed users
+            db = get_mongodb()
+            subscribed_user_ids = await db.get_users_subscribed_to_urls(
+                list(parent_urls)
+            )
+            users_to_notify.update(subscribed_user_ids)
+        else:
+            # No-database mode: check subscriptions in memory
+            for userid, user_info in users.items():
+                # Use set intersection for efficient matching
+                if parent_urls & user_info.subscriptions:
+                    users_to_notify.add(userid)
+
+    def _apply_unsubscriptions(
+        self,
+        parent_links: list[Link],
+        users: dict[int, UserInfo],
+        users_to_notify: set[int],
+    ) -> None:
+        """Apply unsubscriptions blacklist to remove users from notification list.
+
+        If any parent post URL matches a user's unsubscription list, remove that
+        user from the notification list.
+
+        Args:
+            parent_links: List of parent Link objects to check against
+            users: Dictionary of monitored users
+            users_to_notify: Set to remove users from
+        """
+        # Extract normalized URLs from parent links
+        parent_urls = {
+            link.url.removeprefix("https://").removeprefix("http://")
+            for link in parent_links[1:]  # Skip first link (category)
+        }
+
+        if not parent_urls:
+            return
+
+        # Check users in notification list against their unsubscriptions
+        # Only need to check users already in users_to_notify (small set)
+        users_to_remove = set[int]()
+        for userid in users_to_notify:
+            user_info = users[userid]
+            # Check if any parent URL is in user's unsubscriptions (set intersection)
+            if parent_urls & user_info.unsubscriptions:
+                users_to_remove.add(userid)
+                logger.debug(
+                    "User %s unsubscribed from parent post",
+                    user_info.username,
+                )
+
+        # Remove unsubscribed users from notification list
+        users_to_notify.difference_update(users_to_remove)
+
     async def _check_reply(
         self,
         target_post: ForumPost,
@@ -267,15 +348,6 @@ class ScopariaCore:
                 )
                 return
 
-            # Collect all users that should be notified (using set for deduplication)
-            users_to_notify = set[int]()
-
-            # Check for reply notifications
-            await self._check_reply(target_post, thread, users, users_to_notify)
-
-            # Check for mentions in post content
-            self._check_mentions(target_post, users, users_to_notify)
-
             # Build parent links
             post.parents = [
                 Link(
@@ -290,6 +362,23 @@ class ScopariaCore:
                 )
                 for parent in reversed(target_post.parents)
             ]
+
+            # Collect all users that should be notified (using set for deduplication)
+            users_to_notify = set[int]()
+
+            # Check for reply notifications
+            await self._check_reply(target_post, thread, users, users_to_notify)
+
+            # Check subscriptions - add users who subscribed to parent posts
+            await self._check_subscriptions(post.parents, users, users_to_notify)
+
+            # Apply unsubscriptions - remove users who blacklisted parent posts
+            self._apply_unsubscriptions(post.parents, users, users_to_notify)
+
+            # Check for mentions in post content
+            # Note: Mentions are checked AFTER unsubscriptions so that @mentions
+            # always trigger notifications regardless of blacklist settings
+            self._check_mentions(target_post, users, users_to_notify)
 
             # Add post to notification list for each user
             for userid in users_to_notify:

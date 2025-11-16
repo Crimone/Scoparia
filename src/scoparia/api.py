@@ -22,6 +22,73 @@ from . import logger
 from .config import MentionLevel, UserInfo
 
 # ==============================================================================
+# Utility Functions
+# ==============================================================================
+
+
+def normalize_post_url(url: str) -> str | None:
+    """Normalize a forum post/thread URL to standard format.
+
+    Converts various forum URL formats to the standard format:
+    - Thread: {site_url}/forum/t-{thread_id}
+    - Post: {site_url}/forum/t-{thread_id}#post-{post_id}
+
+    Extracts thread_id and optional post_id from the URL and reconstructs it in
+    standard format, removing http/https prefix and any extra path segments.
+
+    Args:
+        url: Forum post/thread URL in any format, e.g.:
+            - https://scp-wiki-cn.wikidot.com/forum/t-123
+            - https://scp-wiki-cn.wikidot.com/forum/t-123/#post-456
+            - https://scp-wiki-cn.wikidot.com/forum/t-123/234#post-456
+            - scp-wiki-cn.wikidot.com/forum/t-123#post-456
+
+    Returns:
+        Normalized URL without protocol prefix in format:
+        - {site_url}/forum/t-{thread_id} (if no post_id)
+        - {site_url}/forum/t-{thread_id}#post-{post_id} (if post_id present)
+        Returns None if URL format is invalid.
+    """
+    # Pattern matches forum URLs with optional http/https prefix and post anchor
+    # Requires .wikidot.com domain; captures: site_url, thread_id, post_anchor
+    pattern = (
+        r"^(?:https?://)?([^/]*\.wikidot\.com/forum/t-)(\d+)(?:/[^#]*)?(#post-\d+)?$"
+    )
+    match = re.match(pattern, url.strip())
+
+    if not match:
+        return None
+
+    site_and_prefix = match.group(1)  # e.g., "scp-wiki-cn.wikidot.com/forum/t-"
+    thread_id = match.group(2)
+    post_anchor = match.group(3)  # Can be None, e.g., "#post-456"
+
+    # Reconstruct in standard format
+    return f"{site_and_prefix}{thread_id}{post_anchor or ''}"
+
+
+def extract_lines_from_page_element(page_elem: Tag, query_tag: str) -> list[str]:
+    """Extract lines from a page element query tag.
+
+    Args:
+        page_elem: BeautifulSoup page element to search within
+        query_tag: CSS selector tag name (e.g., "apprise_urls", "subscriptions")
+
+    Returns:
+        List of non-empty lines extracted from the element
+    """
+    elem = page_elem.select_one(f"span.query_{query_tag}")
+    if not elem:
+        return []
+
+    text = elem.get_text().strip()
+    if not text:
+        return []
+
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+# ==============================================================================
 # Exceptions
 # ==============================================================================
 
@@ -2073,8 +2140,13 @@ async def list_pages(
             # Query ListPagesModule
             page_elements = await _query_list_pages_module(
                 site_url=site_url,
-                fields=["name", "created_by_linked", "content"],
-                form_data_fields=["apprise_urls", "email"],
+                fields=["name", "created_by_linked", "updated_at", "content"],
+                form_data_fields=[
+                    "apprise_urls",
+                    "email",
+                    "subscriptions",
+                    "unsubscriptions",
+                ],
                 per_page=per_page,
                 offset=offset,
                 category=category,
@@ -2132,6 +2204,8 @@ async def sync_user_configs_from_wiki(
     - enable_wikidot_pm: bool (optional, defaults to True)
     - enable_email: bool (optional, defaults to True)
     - enable_apprise: bool (optional, defaults to True)
+    - subscriptions: list[str] (optional, defaults to empty list)
+    - unsubscriptions: list[str] (optional, defaults to empty list)
 
     Username and userid are extracted from the page's created_by_linked field,
     not from the YAML configuration.
@@ -2248,14 +2322,7 @@ async def sync_user_configs_from_wiki(
                 continue
 
             # Get apprise_urls from form_data field (default to empty list)
-            apprise_urls_elem = page_elem.select_one("span.query_apprise_urls")
-            if apprise_urls_elem:
-                apprise_urls_text = apprise_urls_elem.get_text().strip()
-                apprise_urls = [
-                    url.strip() for url in apprise_urls_text.splitlines() if url.strip()
-                ]
-            else:
-                apprise_urls = []
+            apprise_urls = extract_lines_from_page_element(page_elem, "apprise_urls")
 
             # Get timezone (default to UTC)
             timezone = config_dict.get("timezone", "UTC")
@@ -2284,6 +2351,26 @@ async def sync_user_configs_from_wiki(
             enable_email = config_dict.get("enable_email") == "1"
             enable_apprise = config_dict.get("enable_apprise") == "1"
 
+            # Get subscriptions from form_data field (default to empty set)
+            subscription_lines = extract_lines_from_page_element(
+                page_elem, "subscriptions"
+            )
+            subscriptions = {
+                normalized
+                for line in subscription_lines
+                if (normalized := normalize_post_url(line)) is not None
+            }
+
+            # Get unsubscriptions from form_data field (default to empty set)
+            unsubscription_lines = extract_lines_from_page_element(
+                page_elem, "unsubscriptions"
+            )
+            unsubscriptions = {
+                normalized
+                for line in unsubscription_lines
+                if (normalized := normalize_post_url(line)) is not None
+            }
+
             # Create UserInfo object
             user_info = UserInfo(
                 userid=userid,
@@ -2295,6 +2382,8 @@ async def sync_user_configs_from_wiki(
                 enable_wikidot_pm=enable_wikidot_pm,
                 enable_email=enable_email,
                 enable_apprise=enable_apprise,
+                subscriptions=subscriptions,
+                unsubscriptions=unsubscriptions,
             )
 
             user_infos.append(user_info)

@@ -5,7 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from scoparia.api import Link, RSSForumPost, get_client, init_client
+from scoparia.api import (
+    Link,
+    RSSForumPost,
+    get_client,
+    init_client,
+    normalize_post_url,
+)
 
 
 class TestRSSForumPost:
@@ -63,6 +69,70 @@ class TestLink:
         link = Link(text="Test Link", url="https://example.com")
         assert link.text == "Test Link"
         assert link.url == "https://example.com"
+
+
+class TestNormalizePostUrl:
+    """Test normalize_post_url function."""
+
+    def test_normalize_url_with_https(self) -> None:
+        """Test normalizing URL with https prefix."""
+        url = "https://scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+
+    def test_normalize_url_with_http(self) -> None:
+        """Test normalizing URL with http prefix."""
+        url = "http://scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+
+    def test_normalize_url_without_protocol(self) -> None:
+        """Test normalizing URL without protocol prefix."""
+        url = "scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+
+    def test_normalize_url_with_extra_path(self) -> None:
+        """Test normalizing URL with extra path segments."""
+        url = "https://scp-wiki-cn.wikidot.com/forum/t-123/123#post-456"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+
+    def test_normalize_url_with_slash_in_anchor(self) -> None:
+        """Test normalizing URL with slash before anchor."""
+        url = "https://scp-wiki-cn.wikidot.com/forum/t-123/#post-456"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+
+    def test_normalize_thread_url_without_post(self) -> None:
+        """Test normalizing thread URL without post ID."""
+        url = "https://scp-wiki-cn.wikidot.com/forum/t-123"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123"
+
+    def test_normalize_thread_url_with_extra_path(self) -> None:
+        """Test normalizing thread URL with extra path but no post ID."""
+        url = "https://scp-wiki-cn.wikidot.com/forum/t-123/some-title"
+        result = normalize_post_url(url)
+        assert result == "scp-wiki-cn.wikidot.com/forum/t-123"
+
+    def test_normalize_url_invalid_format(self) -> None:
+        """Test that invalid URL format returns None."""
+        url = "https://example.com/invalid"
+        result = normalize_post_url(url)
+        assert result is None
+
+    def test_normalize_url_non_wikidot_domain(self) -> None:
+        """Test that non-wikidot.com domain returns None."""
+        url = "https://example.com/forum/t-123#post-456"
+        result = normalize_post_url(url)
+        assert result is None
+
+    def test_normalize_url_missing_thread_id(self) -> None:
+        """Test that URL missing thread ID returns None."""
+        url = "https://scp-wiki-cn.wikidot.com/forum/t-#post-456"
+        result = normalize_post_url(url)
+        assert result is None
 
 
 class TestClientGlobalFunctions:

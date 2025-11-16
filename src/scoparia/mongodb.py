@@ -59,6 +59,9 @@ class MongoDBClient:
             enable_wikidot_pm = user.get("enable_wikidot_pm", True)
             enable_email = user.get("enable_email", True)
             enable_apprise = user.get("enable_apprise", True)
+            # Get subscriptions and unsubscriptions as sets
+            subscriptions = set(user.get("subscriptions", []))
+            unsubscriptions = set(user.get("unsubscriptions", []))
             # Parse mention notification level
             try:
                 mention_level = MentionLevel(mention_level_str)
@@ -75,8 +78,34 @@ class MongoDBClient:
                 enable_wikidot_pm=enable_wikidot_pm,
                 enable_email=enable_email,
                 enable_apprise=enable_apprise,
+                subscriptions=subscriptions,
+                unsubscriptions=unsubscriptions,
             )
         return users
+
+    async def get_users_subscribed_to_urls(self, urls: list[str]) -> set[int]:
+        """Get user IDs who subscribed to any of the given URLs.
+
+        Args:
+            urls: List of normalized post URLs to check
+
+        Returns:
+            Set of user IDs who have subscribed to any of the URLs
+        """
+        if not urls:
+            return set()
+
+        # Query users whose subscriptions array contains any of the URLs
+        cursor = self.db[COLLECTION_USERS].find(
+            {"subscriptions": {"$in": urls}},
+            {"userid": 1, "_id": 0},  # Only return userid field
+        )
+
+        user_ids = set[int]()
+        async for user in cursor:
+            user_ids.add(user["userid"])
+
+        return user_ids
 
     async def get_user(self, userid: int) -> dict[str, Any] | None:
         """Get a specific user from MongoDB.
@@ -127,6 +156,8 @@ class MongoDBClient:
                         "enable_wikidot_pm": True,
                         "enable_email": True,
                         "enable_apprise": False,
+                        "subscriptions": [],
+                        "unsubscriptions": [],  # Stored as list in DB
                     },
                 },
                 upsert=True,
@@ -162,6 +193,8 @@ class MongoDBClient:
                         "enable_wikidot_pm": user_info.enable_wikidot_pm,
                         "enable_email": user_info.enable_email,
                         "enable_apprise": user_info.enable_apprise,
+                        "subscriptions": list(user_info.subscriptions),
+                        "unsubscriptions": list(user_info.unsubscriptions),
                     }
                 },
                 upsert=True,
@@ -259,6 +292,25 @@ class MongoDBClient:
                                 "disabled, avatarhover, or all"
                             ),
                         },
+                        "subscriptions": {
+                            "bsonType": "array",
+                            "items": {"bsonType": "string"},
+                            "description": (
+                                "List of post URLs to subscribe to. When a new "
+                                "post's parent matches any URL in this list, "
+                                "send notification"
+                            ),
+                        },
+                        "unsubscriptions": {
+                            "bsonType": "array",
+                            "items": {"bsonType": "string"},
+                            "description": (
+                                "Blacklist of post URLs. If a notification "
+                                "would normally be sent but the post's parent "
+                                "matches any URL in this list, remove that user "
+                                "from the notification list"
+                            ),
+                        },
                     },
                 }
             }
@@ -268,6 +320,10 @@ class MongoDBClient:
                 await self.db[COLLECTION_USERS].create_index(
                     [("userid", 1)],
                     unique=True,
+                )
+                # Create index on subscriptions for efficient lookup
+                await self.db[COLLECTION_USERS].create_index(
+                    [("subscriptions", 1)],
                 )
             except Exception as e:
                 logger.debug("Index creation for users: %s", e)

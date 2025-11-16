@@ -73,6 +73,8 @@ class TestUserInfo:
             enable_wikidot_pm=True,
             enable_email=True,
             enable_apprise=True,
+            subscriptions={"https://scp-wiki-cn.wikidot.com/forum/t-123#post-456"},
+            unsubscriptions={"https://scp-wiki-cn.wikidot.com/forum/t-789#post-234"},
         )
         assert user.userid == 123
         assert user.username == "TestUser"
@@ -83,6 +85,12 @@ class TestUserInfo:
         assert user.enable_wikidot_pm is True
         assert user.enable_email is True
         assert user.enable_apprise is True
+        assert user.subscriptions == {
+            "https://scp-wiki-cn.wikidot.com/forum/t-123#post-456"
+        }
+        assert user.unsubscriptions == {
+            "https://scp-wiki-cn.wikidot.com/forum/t-789#post-234"
+        }
 
     def test_user_info_defaults(self) -> None:
         """Test UserInfo with default values."""
@@ -97,6 +105,8 @@ class TestUserInfo:
         assert user.enable_wikidot_pm is True
         assert user.enable_email is True
         assert user.enable_apprise is True
+        assert user.subscriptions == set()
+        assert user.unsubscriptions == set()
 
 
 class TestLoadConfigFromEnv:

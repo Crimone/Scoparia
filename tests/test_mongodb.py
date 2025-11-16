@@ -201,6 +201,10 @@ class TestMongoDBClient:
                 enable_wikidot_pm=True,
                 enable_email=True,
                 enable_apprise=True,
+                subscriptions={"https://scp-wiki-cn.wikidot.com/forum/t-123#post-456"},
+                unsubscriptions={
+                    "https://scp-wiki-cn.wikidot.com/forum/t-789#post-234"
+                },
             )
         ]
 
