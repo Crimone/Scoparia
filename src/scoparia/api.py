@@ -8,7 +8,7 @@ from enum import Enum
 from functools import wraps
 from re import Match
 from typing import Any, cast
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import aiohttp
 import feedparser
@@ -1001,6 +1001,9 @@ class ForumPost(msgspec.Struct):
         Post creator
     created_at : datetime
         Post creation datetime
+    identical_string : str
+        Text fragment identifier for precise URL navigation to this post.
+        Used to construct URLs with #:~:text= fragments for accurate jumping.
     edited_by : User | None, default None
         Post editor (None if not edited)
     edited_at : datetime | None, default None
@@ -1018,6 +1021,7 @@ class ForumPost(msgspec.Struct):
     text: str
     created_by: "User"
     created_at: datetime
+    identical_string: str
     element: BeautifulSoup
     edited_by: "User | None" = None
     edited_at: datetime | None = None
@@ -1354,7 +1358,10 @@ class ForumThread(msgspec.Struct):
 
     @staticmethod
     def _parse_post_from_container(
-        post_elem, post_container, thread_id: int, site_url: str
+        post_elem,
+        post_container,
+        thread_id: int,
+        site_url: str,
     ) -> tuple["ForumPost", int | None]:
         """Parse a ForumPost from post element and container.
 
@@ -1408,6 +1415,14 @@ class ForumThread(msgspec.Struct):
             raise NoElementException("Odate element is not found.")
         created_at = odate_parse(odate_elem)
 
+        # Generate identical_string for text fragment navigation
+        # Combine user text and date text
+        user_text = user_elem.get_text(strip=True)
+        date_text = odate_elem.get_text(strip=True)
+        base_text = f"{user_text} {date_text}"
+        # Generate text fragment URL
+        identical_string = quote(base_text, safe="")
+
         # Get edited info if exists
         edited_by = None
         edited_at = None
@@ -1438,9 +1453,10 @@ class ForumThread(msgspec.Struct):
             id=parsed_post_id,
             title=title,
             text=text,
-            element=post_elem,
             created_by=created_by,
             created_at=created_at,
+            identical_string=identical_string,
+            element=post_elem,
             edited_by=edited_by,
             edited_at=edited_at,
             parents=[],

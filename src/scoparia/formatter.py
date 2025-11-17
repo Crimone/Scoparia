@@ -336,7 +336,7 @@ class HTMLFormatter(NotificationFormatter):
 class MarkdownFormatter(NotificationFormatter):
     """Formatter for Markdown format notifications."""
 
-    separator: str = "\n\n---\n\n"
+    separator: str = "\n\n------\n\n"
     footer: str = "⚡ *Powered by [Scoparia](https://github.com/Crimone/Scoparia)*"
 
     def format_time(self, post: RSSForumPost, timezone: str) -> str:
