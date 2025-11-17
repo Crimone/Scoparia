@@ -21,7 +21,7 @@ from .api import (
 )
 from .config import MentionLevel, UserInfo, get_config
 from .crom import get_page_author_id_from_crom
-from .emailer import send_email
+from .emailer import flush_token_to_github, send_email
 from .formatter import generate_formatter
 from .github_storage import set_github_variable
 from .mongodb import get_mongodb
@@ -699,7 +699,7 @@ class ScopariaCore:
             updated_timestamps_str = msgspec.json.encode(updated_timestamps).decode(
                 "utf-8"
             )
-            set_github_variable("LAST_RSS_CHECK", updated_timestamps_str)
+            await set_github_variable("LAST_RSS_CHECK", updated_timestamps_str)
 
         # Handle first run
         if is_first_run and not new_posts:
@@ -731,6 +731,9 @@ class ScopariaCore:
             await self.send_all_notifications(user_info, posts_list)
 
         logger.info("RSS feed processing complete. Processed %s posts", len(new_posts))
+
+        # Flush any pending O365 token updates to GitHub
+        await flush_token_to_github()
 
 
 # Global core instance

@@ -30,6 +30,8 @@ dependencies = [
     "html2text>=2025.4.15",
     "beautifulsoup4[lxml]>=4.14.2",
     "o365>=2.1.7",
+    "githubkit>=0.13.6",
+    "pynacl>=1.6.1",
 ]
 
 [project.urls]

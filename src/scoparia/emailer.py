@@ -6,14 +6,15 @@ import os
 import msgspec
 from O365 import Account, EnvTokenBackend, MSGraphProtocol
 
-from .github_storage import set_github_variable
+from .github_storage import set_github_secret
 
 
 class GitHubActionTokenBackend(EnvTokenBackend):
-    """A token backend that saves tokens to GitHub Actions environment variables.
+    """A token backend that marks tokens for deferred persistence to GitHub secrets.
 
-    This backend extends EnvTokenBackend to automatically persist token updates
-    to GitHub Actions environment variables using set_github_variable.
+    This backend extends EnvTokenBackend to save tokens to environment variables
+    and mark them for later persistence to GitHub Actions secrets. The actual
+    GitHub secret update is deferred until flush_token_to_github() is called.
     """
 
     def serialize(self) -> bytes | str:
@@ -36,7 +37,11 @@ class GitHubActionTokenBackend(EnvTokenBackend):
             return msgspec.json.decode(token_cache_state) if token_cache_state else {}
 
     def save_token(self, force: bool = False) -> bool:
-        """Save the token and update GitHub Actions environment variable.
+        """Save the token to environment variable and mark for deferred GitHub update.
+
+        The token is immediately saved to the environment variable but only marked
+        for later persistence to GitHub secret. Call flush_token_to_github() to
+        actually update the GitHub secret.
 
         Args:
             force: Force save even when state has not changed.
@@ -50,6 +55,8 @@ class GitHubActionTokenBackend(EnvTokenBackend):
         if force is False and self._has_state_changed is False:
             return True
 
+        global _token_updated
+
         token_str = self.serialize()
 
         if isinstance(token_str, bytes):
@@ -57,7 +64,8 @@ class GitHubActionTokenBackend(EnvTokenBackend):
 
         os.environ[self.token_env_name] = token_str
 
-        set_github_variable(self.token_env_name, token_str)
+        # Mark that token was updated
+        _token_updated = True
 
         return True
 
@@ -93,6 +101,8 @@ _CLIENT_SECRET = os.getenv("O365_CLIENT_SECRET")
 
 # Global account instance (cached to avoid re-authentication)
 _account: Account | None = None
+# Global flag to track if O365 token was updated
+_token_updated = False
 
 
 def _get_account() -> Account:
@@ -117,7 +127,7 @@ def _get_account() -> Account:
 
     # Configure token storage using GitHub Actions environment variable
     # Token is loaded from O365_TOKEN environment variable
-    # Refreshed tokens are written to env var and persisted to GitHub Actions
+    # Refreshed tokens are written to env var and marked for GitHub persistence
     token_backend = GitHubActionTokenBackend(token_env_name="O365_TOKEN")
 
     credentials = (_CLIENT_ID, _CLIENT_SECRET)
@@ -192,3 +202,20 @@ def send_email(title: str, body: str, to_email: str) -> bool:
         raise RuntimeError(
             f"Failed to send email to {_mask_email(to_email)}: {e}"
         ) from e
+
+
+async def flush_token_to_github() -> None:
+    """Flush any pending O365 token updates to GitHub secret.
+
+    This should be called at the end of RSS processing to persist
+    any token refreshes that occurred during email sending.
+    """
+    global _token_updated
+
+    if not _token_updated:
+        return
+
+    token_str = os.environ.get("O365_TOKEN")
+    if token_str:
+        await set_github_secret("O365_TOKEN", token_str)
+        _token_updated = False
