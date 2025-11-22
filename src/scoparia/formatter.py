@@ -69,7 +69,7 @@ def _generate_title(posts: list[RSSForumPost]) -> str:
         Notification title string.
     """
     if len(posts) == 1:
-        return "[Scoparia] New post"
+        return f"[Scoparia] New post from {posts[0].author_name}"
     return f"[Scoparia] {len(posts)} new posts"
 
 
