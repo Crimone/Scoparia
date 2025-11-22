@@ -10,7 +10,6 @@ from .config import MentionLevel, UserInfo, get_config
 
 DB_NAME = "db_scoparia"
 COLLECTION_USERS = "t_users"
-COLLECTION_METADATA = "t_metadata"
 
 
 class MongoDBClient:
@@ -204,32 +203,6 @@ class MongoDBClient:
 
         await self.db[COLLECTION_USERS].bulk_write(operations)
 
-    # Metadata management
-    async def get_metadata(self, key: str) -> Any | None:
-        """Get metadata value from MongoDB.
-
-        Args:
-            key: Metadata key to retrieve (stored as key field).
-
-        Returns:
-            Metadata value or None if not found.
-        """
-        result = await self.db[COLLECTION_METADATA].find_one({"key": key})
-        return result["value"] if result else None
-
-    async def set_metadata(self, key: str, value: Any) -> None:
-        """Set metadata value in MongoDB.
-
-        Args:
-            key: Metadata key (stored as key field).
-            value: Metadata value.
-        """
-        await self.db[COLLECTION_METADATA].update_one(
-            {"key": key},
-            {"$set": {"key": key, "value": value}},
-            upsert=True,
-        )
-
     async def ensure_schema_validation(self) -> None:
         """Set up schema validation for collections.
 
@@ -327,34 +300,6 @@ class MongoDBClient:
                 )
             except Exception as e:
                 logger.debug("Index creation for users: %s", e)
-
-        # Schema validation for metadata collection
-        if COLLECTION_METADATA not in existing_collections:
-            metadata_validator = {
-                "$jsonSchema": {
-                    "bsonType": "object",
-                    "required": ["key", "value"],
-                    "properties": {
-                        "key": {
-                            "description": "Metadata key (unique identifier)",
-                        },
-                        "value": {
-                            "description": "Metadata value (any type)",
-                        },
-                    },
-                }
-            }
-            await self.db.create_collection(
-                COLLECTION_METADATA, validator=metadata_validator
-            )
-            # Create indexes immediately after collection creation
-            try:
-                await self.db[COLLECTION_METADATA].create_index(
-                    [("key", 1)],
-                    unique=True,
-                )
-            except Exception as e:
-                logger.debug("Index creation for metadata: %s", e)
 
 
 # Global MongoDB instance

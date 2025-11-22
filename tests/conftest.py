@@ -82,8 +82,6 @@ def mock_mongodb() -> AsyncMock:
     """Fixture providing a mocked MongoDB client."""
     db = AsyncMock()
     db.get_all_users.return_value = {}
-    db.get_metadata.return_value = None
-    db.set_metadata.return_value = None
     db.upsert_contacts.return_value = None
     db.upsert_users.return_value = None
     return db

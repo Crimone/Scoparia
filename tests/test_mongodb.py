@@ -1,6 +1,5 @@
 """Tests for Scoparia MongoDB module."""
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -227,37 +226,6 @@ class TestMongoDBClient:
         mongodb_client.db["t_users"].bulk_write.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_metadata(self, mongodb_client: MongoDBClient) -> None:
-        """Test getting metadata."""
-        mock_metadata = {"key": "last_rss_check", "value": {"site1": datetime.now(UTC)}}
-
-        mongodb_client.db["t_metadata"].find_one = AsyncMock(return_value=mock_metadata)
-
-        value = await mongodb_client.get_metadata("last_rss_check")
-
-        assert value is not None
-        assert isinstance(value, dict)
-
-    @pytest.mark.asyncio
-    async def test_get_metadata_not_found(self, mongodb_client: MongoDBClient) -> None:
-        """Test getting metadata that doesn't exist."""
-        mongodb_client.db["t_metadata"].find_one = AsyncMock(return_value=None)
-
-        value = await mongodb_client.get_metadata("nonexistent")
-
-        assert value is None
-
-    @pytest.mark.asyncio
-    async def test_set_metadata(self, mongodb_client: MongoDBClient) -> None:
-        """Test setting metadata."""
-        mongodb_client.db["t_metadata"].update_one = AsyncMock()
-
-        metadata_value = {"site1": datetime.now(UTC)}
-        await mongodb_client.set_metadata("last_rss_check", metadata_value)
-
-        mongodb_client.db["t_metadata"].update_one.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_close(self, mongodb_client: MongoDBClient) -> None:
         """Test closing MongoDB connection."""
         mongodb_client.client.close = AsyncMock()
@@ -277,12 +245,11 @@ class TestMongoDBClient:
         # Mock collection creation
         mongodb_client.db.create_collection = AsyncMock()
         mongodb_client.db["t_users"].create_index = AsyncMock()
-        mongodb_client.db["t_metadata"].create_index = AsyncMock()
 
         await mongodb_client.ensure_schema_validation()
 
-        # Should create both collections
-        assert mongodb_client.db.create_collection.call_count == 2
+        # Should create users collection
+        mongodb_client.db.create_collection.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_ensure_schema_validation_existing_collections(
@@ -290,9 +257,7 @@ class TestMongoDBClient:
     ) -> None:
         """Test schema validation when collections already exist."""
         # Mock that collections exist
-        mongodb_client.db.list_collection_names = AsyncMock(
-            return_value=["t_users", "t_metadata"]
-        )
+        mongodb_client.db.list_collection_names = AsyncMock(return_value=["t_users"])
 
         mongodb_client.db.create_collection = AsyncMock()
 
