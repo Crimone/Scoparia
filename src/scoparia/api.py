@@ -2336,6 +2336,26 @@ async def sync_user_configs_from_wiki(
                     page_name,
                     exc_info=True,
                 )
+                # Send Wikidot private message to notify user of invalid YAML
+                try:
+                    subject = "[Scoparia] 用户配置解析失败"
+                    body = (
+                        f"[*{config_wiki_url}/"
+                        f"{user_config_category}:{page_name}/edit/true 您的用户配置]"
+                        "包含无效的多行文本，请检查您的配置，确认在多行文本框的末尾留出空行，修改后重新保存即可。"
+                    )
+                    await get_client().send_private_message(
+                        to_user_id=userid,
+                        subject=subject,
+                        body=body,
+                    )
+                except Exception as pm_error:
+                    logger.error(
+                        "Failed to send PM to user %s about invalid config: %s",
+                        userid,
+                        pm_error,
+                        exc_info=True,
+                    )
                 continue
 
             # Get apprise_urls from form_data field (default to empty list)
