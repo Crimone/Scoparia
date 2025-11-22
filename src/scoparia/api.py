@@ -2256,6 +2256,22 @@ async def sync_user_configs_from_wiki(
                 "span.query_created_by_linked span.printuser"
             )
             if created_by_elem is None:
+                # Check if user was deleted
+                created_by_container = page_elem.select_one(
+                    "span.query_created_by_linked"
+                )
+                if created_by_container is not None:
+                    container_text = created_by_container.get_text().strip()
+                    if container_text == "(user deleted)":
+                        logger.info(
+                            "Page %s created by deleted user, deleting page",
+                            page_name,
+                        )
+                        await get_client().delete_page(
+                            config_wiki_url, f"{user_config_category}:{page_name}"
+                        )
+                        continue
+
                 logger.warning(
                     "Page %s missing created_by_linked element, skipping", page_name
                 )
@@ -2288,24 +2304,9 @@ async def sync_user_configs_from_wiki(
                     page_name,
                     created_by_user.id,
                 )
-
-                # Delete the page using constructed fullname
-                try:
-                    fullname = f"{user_config_category}:{page_name}"
-                    client = get_client()
-                    success = await client.delete_page(config_wiki_url, fullname)
-                    if success:
-                        logger.info("Successfully deleted page %s", fullname)
-                    else:
-                        logger.error("Failed to delete page %s", fullname)
-                except Exception as e:
-                    logger.error(
-                        "Error during page deletion for %s: %s",
-                        page_name,
-                        e,
-                        exc_info=True,
-                    )
-
+                await get_client().delete_page(
+                    config_wiki_url, f"{user_config_category}:{page_name}"
+                )
                 continue
 
             # Get username and userid from created_by_user
