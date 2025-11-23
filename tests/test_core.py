@@ -226,7 +226,7 @@ class TestScopariaCore:
             mock_send_email.assert_called_once()
             call_args = mock_send_email.call_args
             assert call_args.kwargs["to_email"] == "test@example.com"
-            assert call_args.kwargs["title"] == "[Scoparia] New post"
+            assert call_args.kwargs["title"] == "[Scoparia] New post from TestUser"
 
     @pytest.mark.asyncio
     async def test_send_email_notification_no_email(
@@ -281,7 +281,7 @@ class TestScopariaCore:
             mock_client.send_private_message.assert_called_once()
             call_args = mock_client.send_private_message.call_args
             assert call_args.kwargs["to_user_id"] == 123
-            assert call_args.kwargs["subject"] == "[Scoparia] New post"
+            assert call_args.kwargs["subject"] == "[Scoparia] New post from TestUser"
 
     @pytest.mark.asyncio
     async def test_send_all_notifications(

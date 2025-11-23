@@ -1,5 +1,7 @@
 import re
 from abc import ABC, abstractmethod
+from datetime import datetime
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import html2text
@@ -12,6 +14,27 @@ from .api import (
 )
 
 LOGO_URL = "https://cdn.jsdelivr.net/gh/Crimone/Scoparia@main/src/scoparia/static/scoparia.webp"
+
+
+def _generate_identical_string(
+    author_name: str, publish_time: datetime, timezone: str
+) -> str:
+    """Generate identical string for text fragment navigation using user's timezone.
+
+    Args:
+        author_name: Author name of the post.
+        publish_time: Post publish time.
+        timezone: User's timezone (IANA format).
+
+    Returns:
+        URL-encoded string in format: "author_name %-d %b %Y, %H:%M"
+    """
+    user_tz = ZoneInfo(timezone)
+    local_time = publish_time.astimezone(user_tz)
+
+    time_str = local_time.strftime("%d %b %Y, %H:%M").lstrip("0")
+    base_text = f"{author_name} {time_str}"
+    return quote(base_text, safe="")
 
 
 def _truncate_html_safe(html_text: str, max_length: int = 200) -> str:
@@ -106,11 +129,12 @@ class NotificationFormatter(ABC):
         pass
 
     @abstractmethod
-    def format_parent_link(self, parent: Link) -> str:
+    def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link.
 
         Args:
             parent: The parent link to format.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Formatted parent link string.
@@ -131,11 +155,12 @@ class NotificationFormatter(ABC):
         pass
 
     @abstractmethod
-    def format_link(self, post: RSSForumPost) -> str:
+    def format_link(self, post: RSSForumPost, timezone: str) -> str:
         """Format post link line.
 
         Args:
             post: The RSS forum post.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Formatted link line, or empty string if links should be omitted.
@@ -204,14 +229,16 @@ class NotificationFormatter(ABC):
             content = self.format_content(truncated_html)
 
             # Build parents line
-            parent_links = [self.format_parent_link(parent) for parent in post.parents]
+            parent_links = [
+                self.format_parent_link(parent, timezone) for parent in post.parents
+            ]
             parents_line = f"ℹ️ {' » '.join(parent_links)}"
 
             # Format header
             header_line = self.format_header(post, publish_time_str)
 
             # Format link
-            link_line = self.format_link(post)
+            link_line = self.format_link(post, timezone)
 
             # Format complete post section
             post_section = self.format_post_section(
@@ -265,16 +292,23 @@ class HTMLFormatter(NotificationFormatter):
         """
         return html_content
 
-    def format_parent_link(self, parent: Link) -> str:
+    def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link in HTML.
 
         Args:
             parent: The parent link to format.
+            timezone: User's timezone (IANA format).
 
         Returns:
             HTML formatted parent link.
         """
-        return f'<a href="{parent.url}">{parent.text}</a>'
+        url = parent.url
+        if parent.post and parent.post.created_by.name:
+            identical_string = _generate_identical_string(
+                parent.post.created_by.name, parent.post.created_at, timezone
+            )
+            url = f"{url}:~:text={identical_string}"
+        return f'<a href="{url}">{parent.text}</a>'
 
     def format_header(self, post: RSSForumPost, publish_time_str: str) -> str:
         """Format post header line in HTML.
@@ -294,16 +328,20 @@ class HTMLFormatter(NotificationFormatter):
             )
         return f"👤 <strong>{post.author_name}</strong> - 🕐 {publish_time_str}"
 
-    def format_link(self, post: RSSForumPost) -> str:
+    def format_link(self, post: RSSForumPost, timezone: str) -> str:
         """Format post link line in HTML.
 
         Args:
             post: The RSS forum post.
+            timezone: User's timezone (IANA format).
 
         Returns:
             HTML formatted link line.
         """
-        return f'🔗 <a href="{post.link}">{post.link}</a>'
+        identical_string = _generate_identical_string(
+            post.author_name, post.publish_time, timezone
+        )
+        return f'🔗 <a href="{post.link}:~:text={identical_string}">{post.link}</a>'
 
     def format_post_section(
         self,
@@ -367,16 +405,23 @@ class MarkdownFormatter(NotificationFormatter):
         content = h.handle(html_content).strip()
         return "\n".join([f"> {line}" for line in content.split("\n")])
 
-    def format_parent_link(self, parent: Link) -> str:
+    def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link in Markdown.
 
         Args:
             parent: The parent link to format.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Markdown formatted parent link.
         """
-        return f"[{parent.text}]({parent.url})"
+        url = parent.url
+        if parent.post and parent.post.created_by.name:
+            identical_string = _generate_identical_string(
+                parent.post.created_by.name, parent.post.created_at, timezone
+            )
+            url = f"{url}:~:text={identical_string}"
+        return f"[{parent.text}]({url})"
 
     def format_header(self, post: RSSForumPost, publish_time_str: str) -> str:
         """Format post header line in Markdown.
@@ -396,16 +441,20 @@ class MarkdownFormatter(NotificationFormatter):
             )
         return f"👤 **{post.author_name}** - 🕐 {publish_time_str}"
 
-    def format_link(self, post: RSSForumPost) -> str:
+    def format_link(self, post: RSSForumPost, timezone: str) -> str:
         """Format post link line in Markdown.
 
         Args:
             post: The RSS forum post.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Markdown formatted link line.
         """
-        return f"🔗 <{post.link}>"
+        identical_string = _generate_identical_string(
+            post.author_name, post.publish_time, timezone
+        )
+        return f"🔗 [{post.link}]({post.link}:~:text={identical_string})"
 
     def format_post_section(
         self,
@@ -472,11 +521,12 @@ class TextFormatter(NotificationFormatter):
         h.body_width = 0  # Don't wrap lines
         return h.handle(html_content).strip()
 
-    def format_parent_link(self, parent: Link) -> str:
+    def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link in plain text (no link).
 
         Args:
             parent: The parent link to format.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Plain text (just the text, no link).
@@ -497,16 +547,20 @@ class TextFormatter(NotificationFormatter):
             return f"💬 {post.title} - 👤 {post.author_name} - 🕐 {publish_time_str}"
         return f"👤 {post.author_name} - 🕐 {publish_time_str}"
 
-    def format_link(self, post: RSSForumPost) -> str:
+    def format_link(self, post: RSSForumPost, timezone: str) -> str:
         """Format post link line in plain text.
 
         Args:
             post: The RSS forum post.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Plain text formatted link line.
         """
-        return f"🔗 {post.link}"
+        identical_string = _generate_identical_string(
+            post.author_name, post.publish_time, timezone
+        )
+        return f"🔗 {post.link}:~:text={identical_string}"
 
     def format_post_section(
         self,
@@ -568,16 +622,23 @@ class FTMLFormatter(NotificationFormatter):
         content = h.handle(html_content).strip()
         return "\n".join([f"> {line}" for line in content.split("\n")])
 
-    def format_parent_link(self, parent: Link) -> str:
+    def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link in FTML.
 
         Args:
             parent: The parent link to format.
+            timezone: User's timezone (IANA format).
 
         Returns:
             FTML formatted parent link.
         """
-        return f"[*{parent.url} {parent.text}]"
+        url = parent.url
+        if parent.post and parent.post.created_by.name:
+            identical_string = _generate_identical_string(
+                parent.post.created_by.name, parent.post.created_at, timezone
+            )
+            url = f"{url}:~:text={identical_string}"
+        return f"[*{url} {parent.text}]"
 
     def format_header(self, post: RSSForumPost, publish_time_str: str) -> str:
         """Format post header line in FTML.
@@ -597,16 +658,20 @@ class FTMLFormatter(NotificationFormatter):
             )
         return f"[[*user {post.author_name}]] - 🕐 {publish_time_str}"
 
-    def format_link(self, post: RSSForumPost) -> str:
+    def format_link(self, post: RSSForumPost, timezone: str) -> str:
         """Format post link line in FTML.
 
         Args:
             post: The RSS forum post.
+            timezone: User's timezone (IANA format).
 
         Returns:
             FTML formatted link line.
         """
-        return f"🔗 {post.link}"
+        identical_string = _generate_identical_string(
+            post.author_name, post.publish_time, timezone
+        )
+        return f"🔗 [*{post.link}:~:text={identical_string} {post.link}]"
 
     def format_post_section(
         self,
@@ -648,11 +713,12 @@ class QQPushFormatter(TextFormatter):
 
     footer: str = "⚡ Powered by Scoparia"
 
-    def format_link(self, post: RSSForumPost) -> str:
+    def format_link(self, post: RSSForumPost, timezone: str) -> str:
         """Format post link line for QQ Push (omitted).
 
         Args:
             post: The RSS forum post.
+            timezone: User's timezone (IANA format).
 
         Returns:
             Empty string (links are omitted in QQ Push).

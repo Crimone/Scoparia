@@ -359,6 +359,7 @@ class ScopariaCore:
                 Link(
                     text=parent.title if parent.title else UNTITLED_POST_TITLE,
                     url=f"{site_url}/forum/t-{parent.thread_id}#post-{parent.id}",
+                    post=parent,
                 )
                 for parent in reversed(target_post.parents)
             ]

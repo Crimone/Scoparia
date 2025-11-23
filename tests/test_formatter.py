@@ -47,7 +47,7 @@ class TestHTMLFormatter:
         """Test formatting parent link in HTML."""
         formatter = HTMLFormatter()
         link = Link(text="Test Category", url="https://example.com/category")
-        result = formatter.format_parent_link(link)
+        result = formatter.format_parent_link(link, "UTC")
         assert '<a href="https://example.com/category">Test Category</a>' in result
 
     def test_format_header_with_title(self) -> None:
@@ -160,7 +160,7 @@ class TestMarkdownFormatter:
         """Test formatting parent link in Markdown."""
         formatter = MarkdownFormatter()
         link = Link(text="Test Category", url="https://example.com/category")
-        result = formatter.format_parent_link(link)
+        result = formatter.format_parent_link(link, "UTC")
         assert "[Test Category](https://example.com/category)" in result
 
     def test_compose_notification_content(self) -> None:
@@ -201,7 +201,7 @@ class TestTextFormatter:
         """Test formatting parent link in plain text (no link)."""
         formatter = TextFormatter()
         link = Link(text="Test Category", url="https://example.com/category")
-        result = formatter.format_parent_link(link)
+        result = formatter.format_parent_link(link, "UTC")
         assert result == "Test Category"
         assert "http" not in result
 
@@ -253,7 +253,7 @@ class TestFTMLFormatter:
         """Test formatting parent link in FTML."""
         formatter = FTMLFormatter()
         link = Link(text="Test Category", url="https://example.com/category")
-        result = formatter.format_parent_link(link)
+        result = formatter.format_parent_link(link, "UTC")
         assert "[*https://example.com/category Test Category]" in result
 
     def test_format_header(self) -> None:
@@ -317,7 +317,7 @@ class TestQQPushFormatter:
             site_url="https://scp-wiki.wikidot.com",
             parents=[],
         )
-        link_line = formatter.format_link(post)
+        link_line = formatter.format_link(post, "UTC")
         assert link_line == ""
 
     def test_post_process_body_removes_links(self) -> None:
