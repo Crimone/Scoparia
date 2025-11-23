@@ -37,6 +37,26 @@ def _generate_identical_string(
     return quote(base_text, safe="")
 
 
+def _add_blockquote_prefix(text: str) -> str:
+    """Add blockquote prefix (>) to each line of text.
+
+    If a line already starts with '> ', only add '>' without space.
+    Otherwise, add '> ' (with space).
+
+    Args:
+        text: Text to add blockquote prefix to.
+
+    Returns:
+        Text with blockquote prefix added to each line.
+    """
+    lines = text.split("\n")
+    # If line already has '> ' prefix, only add '>'; otherwise add '> '
+    result_lines = [
+        f">{line}" if line.startswith("> ") else f"> {line}" for line in lines
+    ]
+    return "\n".join(result_lines)
+
+
 def _truncate_html_safe(html_text: str, max_length: int = 200) -> str:
     """Truncate HTML text to specified length without breaking tags.
 
@@ -403,7 +423,7 @@ class MarkdownFormatter(NotificationFormatter):
         h = html2text.HTML2Text()
         h.body_width = 0  # Don't wrap lines
         content = h.handle(html_content).strip()
-        return "\n".join([f"> {line}" for line in content.split("\n")])
+        return _add_blockquote_prefix(content)
 
     def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link in Markdown.
@@ -620,7 +640,7 @@ class FTMLFormatter(NotificationFormatter):
         h.ignore_links = True
         h.body_width = 0  # Don't wrap lines
         content = h.handle(html_content).strip()
-        return "\n".join([f"> {line}" for line in content.split("\n")])
+        return _add_blockquote_prefix(content)
 
     def format_parent_link(self, parent: Link, timezone: str) -> str:
         """Format a parent link in FTML.
