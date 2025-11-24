@@ -34,7 +34,7 @@ def _generate_identical_string(
 
     time_str = local_time.strftime("%d %b %Y, %H:%M").lstrip("0")
     base_text = f"{author_name} {time_str}"
-    return quote(base_text, safe="")
+    return quote(base_text, safe="").replace("-", "%2D")
 
 
 def _add_blockquote_prefix(text: str) -> str:
