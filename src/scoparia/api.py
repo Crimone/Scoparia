@@ -1514,6 +1514,7 @@ class Client:
             exceptions={
                 ServerDisconnectedError,
                 TimeoutError,
+                msgspec.DecodeError,
             },
         )
         self._client: RetryClient = RetryClient(
@@ -1571,8 +1572,8 @@ class Client:
         ) as response:
             response.raise_for_status()
             response_content = await response.read()
+            response_body = msgspec.json.decode(response_content)
 
-        response_body = msgspec.json.decode(response_content)
         if not response_body:
             raise ResponseDataException("AMC returned empty data")
 
