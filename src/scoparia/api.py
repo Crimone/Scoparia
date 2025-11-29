@@ -1515,6 +1515,7 @@ class Client:
                 ServerDisconnectedError,
                 TimeoutError,
                 msgspec.DecodeError,
+                SessionCreateException,
             },
         )
         self._client: RetryClient = RetryClient(
