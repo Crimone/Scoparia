@@ -2,6 +2,7 @@
 
 import base64
 import os
+import re
 
 import msgspec
 from O365 import Account, EnvTokenBackend, MSGraphProtocol
@@ -70,29 +71,29 @@ class GitHubActionTokenBackend(EnvTokenBackend):
         return True
 
 
-def _mask_email(email: str) -> str:
-    """Mask email address for logging, keeping first 3 chars and @domain part.
+def _mask_emails_in_text(text: str) -> str:
+    """Mask all email addresses found in a text string.
 
     Args:
-        email: Email address to mask.
+        text: Text that may contain email addresses.
 
     Returns:
-        Masked email address.
+        Text with all email addresses masked.
 
     Example:
-        >>> _mask_email("user@example.com")
-        "use***@example.com"
-        >>> _mask_email("ab@test.com")
-        "ab***@test.com"
+        >>> _mask_emails_in_text("Error for user test@example.com")
+        "Error for user tes***@example.com"
     """
-    if "@" not in email:
-        return "***"
+    # Pattern to match email addresses with capture groups:
+    # Group 1: First 1-3 characters of local part
+    # Group 2: Domain part
+    email_pattern = (
+        r"\b([A-Za-z0-9._%+-]{1,3})[A-Za-z0-9._%+-]*@"
+        r"([A-Za-z0-9.-]+\.[A-Z|a-z]{2,})\b"
+    )
 
-    local, domain = email.split("@", 1)
-    if len(local) <= 3:
-        return f"{local}***@{domain}"
-    else:
-        return f"{local[:3]}***@{domain}"
+    # Replace with first 1-3 chars + *** + @ + domain
+    return re.sub(email_pattern, r"\1***@\2", text)
 
 
 # O365 credentials from environment variables
@@ -198,10 +199,10 @@ def send_email(title: str, body: str, to_email: str) -> bool:
         return bool(success)
 
     except Exception as e:
-        # Re-raise with more context using masked email address
+        # Mask both the recipient email and any emails in the exception message
         raise RuntimeError(
-            f"Failed to send email to {_mask_email(to_email)}: {e}"
-        ) from e
+            _mask_emails_in_text(f"Failed to send email to {to_email}: {e}")
+        ) from None
 
 
 async def flush_token_to_github() -> None:

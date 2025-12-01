@@ -191,7 +191,9 @@ class TestSendEmail:
         mock_account.mailbox.side_effect = Exception("Connection error")
         mock_get_account.return_value = mock_account
 
-        with pytest.raises(RuntimeError, match="Failed to send email"):
+        with pytest.raises(
+            RuntimeError, match=r"Failed to send email to tes\*\*\*@example\.com"
+        ):
             send_email(
                 title="Test Subject",
                 body="Test Body",
