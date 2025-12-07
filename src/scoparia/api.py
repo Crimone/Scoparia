@@ -149,6 +149,13 @@ class SessionCreateException(WikidotException):
         super().__init__(message)
 
 
+class InvalidCookiesException(SessionCreateException):
+    """Exception raised when login fails due to missing cookies (retryable)."""
+
+    def __init__(self):
+        super().__init__("Login attempt failed due to invalid cookies")
+
+
 class LoginRequiredException(WikidotException):
     """Exception raised when login is required but not logged in.
 
@@ -624,6 +631,12 @@ class HTTPAuthentication:
     """
 
     @staticmethod
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=0.4, max=60),
+        retry=retry_if_exception_type(InvalidCookiesException),
+        reraise=True,
+    )
     async def login(
         client: "Client",
         username: str,
@@ -646,42 +659,31 @@ class HTTPAuthentication:
             If login attempt fails (HTTP response code error, authentication
             mismatch, cookie issues, etc.)
         """
-        # Execute login request using the shared async client
-        timeout = aiohttp.ClientTimeout(total=20)
-        async with client._client.post(
-            url="https://www.wikidot.com/default--flow/login__LoginPopupScreen",
+        # Execute login request using _request (has retry logic)
+        response_text, cookies = await client._request(
+            "POST",
+            "https://www.wikidot.com/default--flow/login__LoginPopupScreen",
+            ResponseType.FULL,
             data={
                 "login": username,
                 "password": password,
                 "action": "Login2Action",
                 "event": "login",
             },
-            headers=client.header.get_header(),
-            timeout=timeout,
-        ) as response:
-            # Check status code
-            if response.status != 200:
-                raise SessionCreateException(
-                    "Login attempt is failed due to HTTP status code: "
-                    + str(response.status)
-                )
+        )
 
-            # Check body
-            response_text = await response.text()
-            if "The login and password do not match" in response_text:
-                raise SessionCreateException(
-                    "Login attempt is failed due to invalid username or password"
-                )
+        # Check body
+        if "The login and password do not match" in response_text:
+            raise SessionCreateException(
+                "Login attempt is failed due to invalid username or password"
+            )
 
-            # Check cookies
-            if "WIKIDOT_SESSION_ID" not in response.cookies:
-                raise SessionCreateException(
-                    "Login attempt is failed due to invalid cookies"
-                )
+        # Check cookies
+        if "WIKIDOT_SESSION_ID" not in cookies:
+            raise InvalidCookiesException()
 
-            # Set cookies
-            session_id = response.cookies["WIKIDOT_SESSION_ID"].value
-            client.header.set_cookie("WIKIDOT_SESSION_ID", session_id)
+        # Set cookies
+        client.header.set_cookie("WIKIDOT_SESSION_ID", cookies["WIKIDOT_SESSION_ID"])
 
     @staticmethod
     async def logout(client: "Client"):
