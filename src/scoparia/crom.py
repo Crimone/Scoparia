@@ -4,54 +4,45 @@ import base64
 
 import aiohttp
 import msgspec
-from aiohttp_retry import ExponentialRetry, RetryClient
+from aiohttp.client_exceptions import ClientResponseError
+from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt
 
 from . import logger
 
 CROM_API_URL = "https://apiv2.crom.avn.sh/graphql"
 
 
-class CROMRetryOptions(ExponentialRetry):
-    """Custom retry options that respect Retry-After header for rate limiting."""
+def _wait_with_retry_after(retry_state: RetryCallState) -> float:
+    """Custom wait function that respects Retry-After header.
 
-    def get_timeout(
-        self, attempt: int, response: aiohttp.ClientResponse | None = None
-    ) -> float:
-        """Get timeout for next retry, respecting Retry-After header.
+    Falls back to exponential backoff if no Retry-After is available.
+    """
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
 
-        Args:
-            attempt: Current attempt number (1-indexed).
-            response: The response object, if available.
+    # Check Retry-After header from ClientResponseError (429 rate limiting)
+    if isinstance(exc, ClientResponseError) and exc.status == 429:
+        retry_after = exc.headers.get("Retry-After") if exc.headers else None
+        if retry_after:
+            try:
+                wait_time = float(retry_after)
+                logger.info("Rate limited, respecting Retry-After: %ss", wait_time)
+                return wait_time
+            except ValueError:
+                logger.warning(
+                    "Retry-After header contains date format: %s", retry_after
+                )
 
-        Returns:
-            Timeout in seconds before next retry.
-        """
-        # Check if response has Retry-After header (for 429 rate limiting)
-        if response is not None and response.status == 429:
-            retry_after = response.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    # Retry-After can be either seconds or HTTP date
-                    # Try to parse as integer (seconds) first
-                    wait_time = float(retry_after)
-                    logger.info(
-                        "Rate limited, respecting Retry-After: %ss",
-                        wait_time,
-                    )
-                    return wait_time
-                except ValueError:
-                    # If not a number, it might be an HTTP date
-                    # For simplicity, fall back to exponential backoff
-                    logger.warning(
-                        "Retry-After header contains date format: %s, "
-                        "using exponential backoff instead",
-                        retry_after,
-                    )
-
-        # Fall back to exponential backoff
-        return super().get_timeout(attempt, response)
+    # Exponential backoff: 0.4 * 2^attempt, max 60s
+    attempt = retry_state.attempt_number
+    return min(0.4 * (2**attempt), 60)
 
 
+@retry(
+    stop=stop_after_attempt(10),
+    wait=_wait_with_retry_after,
+    retry=retry_if_exception_type((TimeoutError, ClientResponseError)),
+    reraise=True,
+)
 async def get_page_author_id_from_crom(site_url: str, page_fullname: str) -> int | None:
     """Get page author ID from CROM API.
 
@@ -82,19 +73,9 @@ async def get_page_author_id_from_crom(site_url: str, page_fullname: str) -> int
 
     variables = {"url": canonical_url}
 
-    # Configure retry strategy with exponential backoff and Retry-After support
-    retry_options = CROMRetryOptions(
-        attempts=10,
-        start_timeout=0.4,
-        statuses={429, 500, 502, 503, 504},
-    )
-
     try:
         async with aiohttp.ClientSession() as session:
-            retry_client = RetryClient(
-                client_session=session, retry_options=retry_options
-            )
-            async with retry_client.post(
+            async with session.post(
                 CROM_API_URL,
                 json={"query": query, "variables": variables},
                 timeout=aiohttp.ClientTimeout(total=10),

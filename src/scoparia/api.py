@@ -13,10 +13,19 @@ from urllib.parse import urlparse
 import aiohttp
 import feedparser
 import msgspec
-from aiohttp.client_exceptions import ServerDisconnectedError
-from aiohttp_retry import ExponentialRetry, RetryClient
+from aiohttp.client_exceptions import (
+    ClientOSError,
+    ClientResponseError,
+    ServerDisconnectedError,
+)
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from . import logger
 from .config import MentionLevel, UserInfo
@@ -1461,6 +1470,15 @@ class ForumThread(msgspec.Struct):
 # ==============================================================================
 
 
+class ResponseType(str, Enum):
+    """Enumeration of HTTP response types."""
+
+    BYTES = "bytes"
+    TEXT = "text"
+    JSON = "json"
+    FULL = "full"  # Returns (text, cookies)
+
+
 class Client:
     """Core client managing connections and interactions with Wikidot API.
 
@@ -1501,25 +1519,9 @@ class Client:
             limit_per_host=self.config.semaphore_limit,
         )
         timeout = aiohttp.ClientTimeout(total=self.config.request_timeout)
-        base_session = aiohttp.ClientSession(
+        self._client: aiohttp.ClientSession = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
-        )
-
-        # Configure retry strategy: 10 retries with exponential backoff
-        retry_options = ExponentialRetry(
-            attempts=10,
-            start_timeout=0.4,
-            statuses={429, 500, 502, 503, 504},
-            exceptions={
-                ServerDisconnectedError,
-                TimeoutError,
-                msgspec.DecodeError,
-                SessionCreateException,
-            },
-        )
-        self._client: RetryClient = RetryClient(
-            client_session=base_session, retry_options=retry_options
         )
 
         # Initialize session-related variables
@@ -1533,6 +1535,63 @@ class Client:
     async def aclose(self) -> None:
         """Close the async client session and release connections."""
         await self._client.close()
+
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=0.4, max=60),
+        retry=retry_if_exception_type(
+            (
+                ServerDisconnectedError,
+                ClientOSError,
+                TimeoutError,
+                msgspec.DecodeError,
+                ClientResponseError,
+            )
+        ),
+        reraise=True,
+    )
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        response_type: ResponseType = ResponseType.BYTES,
+        **kwargs: Any,
+    ) -> Any:
+        """Send an HTTP request with retry.
+
+        Parameters
+        ----------
+        method : str
+            HTTP method (GET, POST, etc.)
+        url : str
+            URL to request
+        response_type : ResponseType
+            Type of response to return
+        **kwargs : Any
+            Additional arguments passed to aiohttp request
+
+        Returns
+        -------
+        Any
+            Response content based on response_type
+        """
+        if "headers" not in kwargs:
+            kwargs["headers"] = self.header.get_header()
+
+        async with self._client.request(method, url, **kwargs) as response:
+            response.raise_for_status()
+            match response_type:
+                case ResponseType.BYTES:
+                    return await response.read()
+                case ResponseType.TEXT:
+                    return await response.text()
+                case ResponseType.JSON:
+                    content = await response.read()
+                    return msgspec.json.decode(content)
+                case ResponseType.FULL:
+                    text = await response.text()
+                    cookies = {k: v.value for k, v in response.cookies.items()}
+                    return text, cookies
 
     async def ajax(self, body: dict[str, Any], site_url: str) -> dict[str, Any]:
         """Send a single request to Ajax Module Connector (async).
@@ -1566,14 +1625,9 @@ class Client:
         body_copy["wikidot_token7"] = token
         logger.debug("Ajax Request: %s -> %s", url, body_copy)
 
-        async with self._client.post(
-            url,
-            headers=self.header.get_header(),
-            data=body_copy,
-        ) as response:
-            response.raise_for_status()
-            response_content = await response.read()
-            response_body = msgspec.json.decode(response_content)
+        response_body = await self._request(
+            "POST", url, ResponseType.JSON, data=body_copy
+        )
 
         if not response_body:
             raise ResponseDataException("AMC returned empty data")
@@ -1620,9 +1674,7 @@ class Client:
             logger.info("Filtering posts since: %s", since.isoformat())
 
         # Fetch RSS feed with automatic retry
-        async with self._client.get(rss_feed_url) as response:
-            response.raise_for_status()
-            content = await response.read()
+        content = await self._request("GET", rss_feed_url)
 
         # Parse RSS feed using feedparser
         feed = feedparser.parse(content)
@@ -1897,16 +1949,14 @@ class Client:
             # Access the page with norender/noredirect to get page ID
             page_url = f"{site_url}/{fullname}/norender/true/noredirect/true"
 
-            async with self._client.get(
-                page_url, headers=self.header.get_header()
-            ) as response:
-                response.raise_for_status()
-                html_content = await response.text()
+            html_content, cookies = await self._request(
+                "GET", page_url, ResponseType.FULL
+            )
 
-                # Update cookies from response
-                for cookie_name, cookie in response.cookies.items():
-                    self.header.set_cookie(cookie_name, cookie.value)
-                    logger.debug("Updated cookie %s: %s", cookie_name, cookie.value)
+            # Update cookies from response
+            for cookie_name, cookie_value in cookies.items():
+                self.header.set_cookie(cookie_name, cookie_value)
+                logger.debug("Updated cookie %s: %s", cookie_name, cookie_value)
 
             # Extract page ID directly from HTML content
             page_id_match = re.search(

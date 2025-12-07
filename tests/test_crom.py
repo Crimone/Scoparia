@@ -26,21 +26,20 @@ class TestGetPageAuthorIdFromCrom:
             return_value=f'{{"data":{{"wikidotPage":{{"createdBy":{{"id":"{encoded_id}"}}}}}}}}'.encode()
         )
 
-        # Mock the retry client
-        mock_retry_client = AsyncMock()
-        mock_retry_client.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_retry_client.__aexit__ = AsyncMock(return_value=None)
-        mock_retry_client.post = MagicMock(return_value=mock_retry_client)
+        # Mock the session
+        mock_session = AsyncMock()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=mock_response),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
 
-        with (
-            patch("scoparia.crom.RetryClient") as mock_retry_client_class,
-            patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class,
-        ):
-            mock_retry_client_class.return_value = mock_retry_client
-            mock_session = AsyncMock()
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=None)
-            mock_session_class.return_value = mock_session
+        with patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class:
+            mock_session_class.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await get_page_author_id_from_crom(
                 "https://scp-wiki.wikidot.com", "scp-173"
@@ -59,21 +58,20 @@ class TestGetPageAuthorIdFromCrom:
             return_value=b'{"data":{"wikidotPage":{"createdBy":null}}}'
         )
 
-        # Mock the retry client
-        mock_retry_client = AsyncMock()
-        mock_retry_client.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_retry_client.__aexit__ = AsyncMock(return_value=None)
-        mock_retry_client.post = MagicMock(return_value=mock_retry_client)
+        # Mock the session
+        mock_session = AsyncMock()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=mock_response),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
 
-        with (
-            patch("scoparia.crom.RetryClient") as mock_retry_client_class,
-            patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class,
-        ):
-            mock_retry_client_class.return_value = mock_retry_client
-            mock_session = AsyncMock()
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=None)
-            mock_session_class.return_value = mock_session
+        with patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class:
+            mock_session_class.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await get_page_author_id_from_crom(
                 "https://scp-wiki.wikidot.com", "scp-173"
@@ -84,23 +82,22 @@ class TestGetPageAuthorIdFromCrom:
     @pytest.mark.asyncio
     async def test_get_page_author_id_http_client_error(self) -> None:
         """Test handling HTTP client errors."""
-        # Mock the retry client to raise ClientError
-        mock_retry_client = AsyncMock()
-        mock_retry_client.__aenter__ = AsyncMock(
-            side_effect=aiohttp.ClientError("Connection error")
+        # Mock the session to raise ClientError
+        mock_session = AsyncMock()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(
+                    side_effect=aiohttp.ClientError("Connection error")
+                ),
+                __aexit__=AsyncMock(return_value=None),
+            )
         )
-        mock_retry_client.__aexit__ = AsyncMock(return_value=None)
-        mock_retry_client.post = MagicMock(return_value=mock_retry_client)
 
-        with (
-            patch("scoparia.crom.RetryClient") as mock_retry_client_class,
-            patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class,
-        ):
-            mock_retry_client_class.return_value = mock_retry_client
-            mock_session = AsyncMock()
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=None)
-            mock_session_class.return_value = mock_session
+        with patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class:
+            mock_session_class.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
             with pytest.raises(aiohttp.ClientError):
                 await get_page_author_id_from_crom(
@@ -116,21 +113,20 @@ class TestGetPageAuthorIdFromCrom:
         mock_response.raise_for_status = MagicMock()
         mock_response.read = AsyncMock(return_value=b'{"data":{}}')
 
-        # Mock the retry client
-        mock_retry_client = AsyncMock()
-        mock_retry_client.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_retry_client.__aexit__ = AsyncMock(return_value=None)
-        mock_retry_client.post = MagicMock(return_value=mock_retry_client)
+        # Mock the session
+        mock_session = AsyncMock()
+        mock_session.post = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=mock_response),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
 
-        with (
-            patch("scoparia.crom.RetryClient") as mock_retry_client_class,
-            patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class,
-        ):
-            mock_retry_client_class.return_value = mock_retry_client
-            mock_session = AsyncMock()
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=None)
-            mock_session_class.return_value = mock_session
+        with patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class:
+            mock_session_class.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
             with pytest.raises((KeyError, TypeError)):
                 await get_page_author_id_from_crom(
@@ -151,22 +147,21 @@ class TestGetPageAuthorIdFromCrom:
             return_value=f'{{"data":{{"wikidotPage":{{"createdBy":{{"id":"{encoded_id}"}}}}}}}}'.encode()
         )
 
-        # Mock the retry client
-        mock_retry_client = AsyncMock()
-        mock_retry_client.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_retry_client.__aexit__ = AsyncMock(return_value=None)
-        mock_post_call = MagicMock(return_value=mock_retry_client)
-        mock_retry_client.post = mock_post_call
+        # Mock the session with post call tracking
+        mock_session = AsyncMock()
+        mock_post_call = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=mock_response),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
+        mock_session.post = mock_post_call
 
-        with (
-            patch("scoparia.crom.RetryClient") as mock_retry_client_class,
-            patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class,
-        ):
-            mock_retry_client_class.return_value = mock_retry_client
-            mock_session = AsyncMock()
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=None)
-            mock_session_class.return_value = mock_session
+        with patch("scoparia.crom.aiohttp.ClientSession") as mock_session_class:
+            mock_session_class.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
             await get_page_author_id_from_crom(
                 "https://scp-wiki.wikidot.com", "scp-173"
