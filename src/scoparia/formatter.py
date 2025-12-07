@@ -474,7 +474,7 @@ class MarkdownFormatter(NotificationFormatter):
         identical_string = _generate_identical_string(
             post.author_name, post.publish_time, timezone
         )
-        return f"🔗 [{post.link}]({post.link}:~:text={identical_string})"
+        return f"🔗 <{post.link}:~:text={identical_string}>"
 
     def format_post_section(
         self,
