@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import aiohttp
 import feedparser
 import msgspec
+import yaml
 from aiohttp.client_exceptions import (
     ClientOSError,
     ClientResponseError,
@@ -85,12 +86,19 @@ def extract_lines_from_page_element(page_elem: Tag, query_tag: str) -> list[str]
 
     Returns:
         List of non-empty lines extracted from the element
+
+    Raises:
+        NeedsSanitizationError: If multiple query tags are found
+            (indicates page needs sanitization)
     """
-    elem = page_elem.select_one(f"span.query_{query_tag}")
-    if not elem:
+    elems = page_elem.select(f"span.query_{query_tag}")
+    if len(elems) > 1:
+        raise NeedsSanitizationError(f"Multiple span.query_{query_tag} elements found")
+
+    if not elems:
         return []
 
-    text = elem.get_text().strip()
+    text = elems[0].get_text().strip()
     if not text:
         return []
 
@@ -209,6 +217,13 @@ class WikidotStatusCodeException(AjaxModuleConnectorException):
         self.status_code = status_code
 
 
+class TryAgainException(WikidotStatusCodeException):
+    """Exception raised when AMC returns 'try_again' status."""
+
+    def __init__(self):
+        super().__init__("AMC error status: try_again", "try_again")
+
+
 class ResponseDataException(AjaxModuleConnectorException):
     """Exception raised when AMC response data is invalid.
 
@@ -276,6 +291,19 @@ class ForbiddenException(WikidotException):
 
 class NoElementException(WikidotException):
     """Exception raised when required element is not found.
+
+    Parameters
+    ----------
+    message : str
+        Exception message
+    """
+
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class NeedsSanitizationError(WikidotException):
+    """Raised when a page needs sanitization due to malformed query tags.
 
     Parameters
     ----------
@@ -1593,6 +1621,12 @@ class Client:
                     cookies = {k: v.value for k, v in response.cookies.items()}
                     return text, cookies
 
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=0.4, max=60),
+        retry=retry_if_exception_type(TryAgainException),
+        reraise=True,
+    )
     async def ajax(self, body: dict[str, Any], site_url: str) -> dict[str, Any]:
         """Send a single request to Ajax Module Connector (async).
 
@@ -1636,6 +1670,8 @@ class Client:
             status = response_body["status"]
             if status == "no_permission":
                 raise ForbiddenException("No permission to perform this action")
+            if status == "try_again":
+                raise TryAgainException()
             raise WikidotStatusCodeException(f"AMC error status: {status}", status)
 
         return response_body
@@ -1925,6 +1961,36 @@ class Client:
             )
             return False
 
+    async def _get_page_id(self, site_url: str, fullname: str) -> int | None:
+        """Get page ID from page HTML.
+
+        Parameters
+        ----------
+        site_url : str
+            Site URL where the page belongs
+        fullname : str
+            Page fullname
+
+        Returns
+        -------
+        int | None
+            Page ID if found, None otherwise
+        """
+        page_url = f"{site_url}/{fullname}/norender/true/noredirect/true"
+
+        html_content, cookies = await self._request("GET", page_url, ResponseType.FULL)
+
+        # Update cookies from response
+        for cookie_name, cookie_value in cookies.items():
+            self.header.set_cookie(cookie_name, cookie_value)
+
+        # Extract page ID from HTML content
+        page_id_match = re.search(r"WIKIREQUEST\.info\.pageId = (\d+);", html_content)
+        if page_id_match is None:
+            return None
+
+        return int(page_id_match.group(1))
+
     async def delete_page(self, site_url: str, fullname: str) -> bool:
         """Delete a page using Ajax Module Connector.
 
@@ -1946,34 +2012,17 @@ class Client:
             If the ajax request fails or page cannot be found
         """
         try:
-            # Access the page with norender/noredirect to get page ID
-            page_url = f"{site_url}/{fullname}/norender/true/noredirect/true"
-
-            html_content, cookies = await self._request(
-                "GET", page_url, ResponseType.FULL
-            )
-
-            # Update cookies from response
-            for cookie_name, cookie_value in cookies.items():
-                self.header.set_cookie(cookie_name, cookie_value)
-                logger.debug("Updated cookie %s: %s", cookie_name, cookie_value)
-
-            # Extract page ID directly from HTML content
-            page_id_match = re.search(
-                r"WIKIREQUEST\.info\.pageId = (\d+);", html_content
-            )
-            if page_id_match is None:
+            page_id = await self._get_page_id(site_url, fullname)
+            if page_id is None:
                 logger.warning("Page ID not found for %s", fullname)
                 return False
-
-            page_id = int(page_id_match.group(1))
 
             # Delete the page using Ajax
             response = await self.ajax(
                 {
                     "action": "WikiPageAction",
                     "event": "deletePage",
-                    "page_id": str(page_id),
+                    "page_id": page_id,
                     "moduleName": "Empty",
                 },
                 site_url,
@@ -1993,6 +2042,163 @@ class Client:
                 return False
         except Exception as e:
             logger.error("Error deleting page %s: %s", fullname, e, exc_info=True)
+            return False
+
+    async def sanitize_page(
+        self,
+        site_url: str,
+        fullname: str,
+    ) -> bool:
+        """Sanitize a page by ensuring multiline fields end with newline.
+
+        Fetches the page source and checks if apprise_urls, subscriptions,
+        or unsubscriptions fields are non-empty but missing a trailing newline.
+        If so, appends the newline and saves the page.
+
+        Parameters
+        ----------
+        site_url : str
+            Site URL where the page belongs (e.g., "https://scp-wiki-cn.wikidot.com")
+        fullname : str
+            Page fullname to sanitize
+
+        Returns
+        -------
+        bool
+            True if sanitization was successful or not needed,
+            False if page is locked or operation failed
+
+        Raises
+        ------
+        NotFoundException
+            If page does not exist
+        """
+        try:
+            page_id = await self._get_page_id(site_url, fullname)
+            if page_id is None:
+                raise NotFoundException(f"Page not found: {fullname}")
+
+            # Get page source
+            view_source_response = await self.ajax(
+                {
+                    "page_id": page_id,
+                    "moduleName": "viewsource/ViewSourceModule",
+                },
+                site_url,
+            )
+
+            # Parse source from response body
+            body_html = view_source_response.get("body", "")
+            soup = BeautifulSoup(body_html, "lxml")
+            source_elem = soup.select_one("div.page-source")
+            if source_elem is None:
+                logger.warning("Page source not found for %s", fullname)
+                return False
+
+            source = source_elem.get_text().strip()
+
+            # Parse YAML to check multiline fields
+            try:
+                config = msgspec.yaml.decode(source)
+            except Exception:
+                logger.warning("Failed to parse YAML for page %s", fullname)
+                return False
+
+            if not isinstance(config, dict):
+                logger.warning("Page %s config is not a dict", fullname)
+                return False
+
+            # Check if any single-line field needs sanitization
+            # Only single-line non-empty values need trailing \n
+            fields_to_check = ["apprise_urls", "subscriptions", "unsubscriptions"]
+            needs_fix = False
+
+            for field in fields_to_check:
+                value = config.get(field, "")
+                # Single-line: non-empty, no \n inside, needs trailing \n
+                if value and "\n" not in value:
+                    config[field] = value + "\n"
+                    needs_fix = True
+
+            if not needs_fix:
+                logger.debug("Page %s does not need sanitization", fullname)
+                return True
+
+            # Encode back to YAML (use double quotes only for multiline strings)
+            dumper = yaml.SafeDumper
+            dumper.add_representer(
+                str,
+                lambda d, s: d.represent_scalar(
+                    "tag:yaml.org,2002:str", s, '"' if "\n" in s else None
+                ),
+            )
+            fixed_source = yaml.dump(
+                config, Dumper=dumper, allow_unicode=True, sort_keys=False
+            )
+
+            # Acquire page lock
+            page_lock_response = await self.ajax(
+                {
+                    "mode": "page",
+                    "wiki_page": fullname,
+                    "page_id": page_id,
+                    "moduleName": "edit/PageEditModule",
+                },
+                site_url,
+            )
+
+            # Skip if page is locked by another user
+            if "locked" in page_lock_response or "other_locks" in page_lock_response:
+                logger.info("Page %s is locked, skipping sanitization", fullname)
+                return False
+
+            # Get lock credentials and revision ID
+            lock_id = page_lock_response["lock_id"]
+            lock_secret = page_lock_response["lock_secret"]
+            page_revision_id = page_lock_response.get("page_revision_id", "")
+
+            # Get title from page lock response body
+            lock_body_html = page_lock_response.get("body", "")
+            lock_soup = BeautifulSoup(lock_body_html, "lxml")
+            title_input = lock_soup.select_one("input#edit-page-title")
+            title = title_input.get("value", "") if title_input else ""
+
+            # Save the page
+            edit_body: dict[str, Any] = {
+                "action": "WikiPageAction",
+                "event": "savePage",
+                "moduleName": "Empty",
+                "mode": "page",
+                "lock_id": lock_id,
+                "lock_secret": lock_secret,
+                "revision_id": page_revision_id,
+                "wiki_page": fullname,
+                "page_id": page_id,
+                "title": title,
+                "source": fixed_source,
+                "comments": "Auto-sanitize multiline fields",
+            }
+
+            response = await self.ajax(edit_body, site_url)
+
+            if response.get("status") == "ok":
+                logger.info(
+                    "Successfully sanitized page %s (ID: %s)", fullname, page_id
+                )
+                return True
+            else:
+                logger.warning(
+                    "Failed to sanitize page %s (ID: %s): %s",
+                    fullname,
+                    page_id,
+                    response.get("message", "Unknown error"),
+                )
+                return False
+
+        except NotFoundException:
+            raise
+        except Exception as e:
+            logger.error("Error sanitizing page %s: %s", fullname, e, exc_info=True)
             return False
 
 
@@ -2285,15 +2491,15 @@ async def sync_user_configs_from_wiki(
     user_infos: list[UserInfo] = []
 
     for page_elem in page_elements:
+        # Get name from page element
+        name_elem = page_elem.select_one("span.query_name")
+        if name_elem is None:
+            logger.debug("Page element missing name, skipping")
+            continue
+
+        page_name = name_elem.get_text().strip()
+
         try:
-            # Get name from page element
-            name_elem = page_elem.select_one("span.query_name")
-            if name_elem is None:
-                logger.debug("Page element missing name, skipping")
-                continue
-
-            page_name = name_elem.get_text().strip()
-
             # Get created_by_linked and verify it matches the name
             created_by_elem = page_elem.select_one(
                 "span.query_created_by_linked span.printuser"
@@ -2373,33 +2579,10 @@ async def sync_user_configs_from_wiki(
             # Parse YAML config using msgspec
             try:
                 config_dict = msgspec.yaml.decode(raw_config)
-            except Exception:
-                logger.error(
-                    "Could not parse user config %s: invalid YAML format",
-                    page_name,
-                    exc_info=True,
-                )
-                # Send Wikidot private message to notify user of invalid YAML
-                try:
-                    subject = "[Scoparia] 用户配置解析失败"
-                    body = (
-                        f"[*{config_wiki_url}/"
-                        f"{user_config_category}:{page_name}/edit/true 您的用户配置]"
-                        "包含无效的多行文本，请检查您的配置，确认在多行文本框的末尾留出空行，修改后重新保存即可。"
-                    )
-                    await get_client().send_private_message(
-                        to_user_id=userid,
-                        subject=subject,
-                        body=body,
-                    )
-                except Exception as pm_error:
-                    logger.error(
-                        "Failed to send PM to user %s about invalid config: %s",
-                        userid,
-                        pm_error,
-                        exc_info=True,
-                    )
-                continue
+            except Exception as e:
+                raise NeedsSanitizationError(
+                    f"Invalid YAML format for page {page_name}"
+                ) from e
 
             # Get apprise_urls from form_data field (default to empty list)
             apprise_urls = extract_lines_from_page_element(page_elem, "apprise_urls")
@@ -2473,6 +2656,25 @@ async def sync_user_configs_from_wiki(
                 userid,
                 page_name,
             )
+
+        except NeedsSanitizationError:
+            logger.warning(
+                "Page %s has malformed fields, attempting to sanitize",
+                page_name,
+            )
+            try:
+                await get_client().sanitize_page(
+                    config_wiki_url,
+                    f"{user_config_category}:{page_name}",
+                )
+            except Exception as sanitize_error:
+                logger.error(
+                    "Failed to sanitize page %s: %s",
+                    page_name,
+                    sanitize_error,
+                    exc_info=True,
+                )
+            continue
 
         except Exception as e:
             logger.error(
