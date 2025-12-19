@@ -224,11 +224,14 @@ class WikidotStatusCodeException(AjaxModuleConnectorException):
         self.status_code = status_code
 
 
-class TryAgainException(WikidotStatusCodeException):
-    """Exception raised when AMC returns 'try_again' status."""
+class RetryableStatusException(WikidotStatusCodeException):
+    """Exception raised when AMC returns a retryable status.
 
-    def __init__(self):
-        super().__init__("AMC error status: try_again", "try_again")
+    Retryable statuses include 'try_again' and 'not_ok'.
+    """
+
+    def __init__(self, status: str):
+        super().__init__(f"AMC error status: {status}", status)
 
 
 class ResponseDataException(AjaxModuleConnectorException):
@@ -1626,7 +1629,7 @@ class Client:
     @retry(
         stop=stop_after_attempt(10),
         wait=wait_exponential(multiplier=0.4, max=60),
-        retry=retry_if_exception_type(TryAgainException),
+        retry=retry_if_exception_type(RetryableStatusException),
         reraise=True,
     )
     async def ajax(self, body: dict[str, Any], site_url: str) -> dict[str, Any]:
@@ -1672,8 +1675,8 @@ class Client:
             status = response_body["status"]
             if status == "no_permission":
                 raise ForbiddenException("No permission to perform this action")
-            if status == "try_again":
-                raise TryAgainException()
+            if status in ("try_again", "not_ok"):
+                raise RetryableStatusException(status)
             raise WikidotStatusCodeException(f"AMC error status: {status}", status)
 
         return response_body
