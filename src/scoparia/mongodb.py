@@ -47,39 +47,8 @@ class MongoDBClient:
         """
         users: dict[int, UserInfo] = {}
         async for user in self.db[COLLECTION_USERS].find():
-            userid = user["userid"]
-            username = user["username"]
-            apprise_urls = user["apprise_urls"]
-            timezone = user.get("timezone", "UTC")  # Default to UTC if not set
-            mention_level_str = user.get("mention_level", "avatarhover")
-            email = user.get("email")  # Optional field
-            # Get notification enable flags, default to True if not set
-            # (backward compatibility)
-            enable_wikidot_pm = user.get("enable_wikidot_pm", True)
-            enable_email = user.get("enable_email", True)
-            enable_apprise = user.get("enable_apprise", True)
-            # Get subscriptions and unsubscriptions as sets
-            subscriptions = set(user.get("subscriptions", []))
-            unsubscriptions = set(user.get("unsubscriptions", []))
-            # Parse mention notification level
-            try:
-                mention_level = MentionLevel(mention_level_str)
-            except ValueError:
-                mention_level = MentionLevel.AVATARHOVER
-
-            users[userid] = UserInfo(
-                userid=userid,
-                username=username,
-                apprise_urls=apprise_urls,
-                timezone=timezone,
-                mention_level=mention_level,
-                email=email,
-                enable_wikidot_pm=enable_wikidot_pm,
-                enable_email=enable_email,
-                enable_apprise=enable_apprise,
-                subscriptions=subscriptions,
-                unsubscriptions=unsubscriptions,
-            )
+            user_info = self._user_doc_to_info(user)
+            users[user_info.userid] = user_info
         return users
 
     async def get_users_subscribed_to_urls(self, urls: list[str]) -> set[int]:
@@ -106,17 +75,62 @@ class MongoDBClient:
 
         return user_ids
 
-    async def get_user(self, userid: int) -> dict[str, Any] | None:
-        """Get a specific user from MongoDB.
+    async def get_user(self, userid: int) -> UserInfo | None:
+        """Get a specific user from MongoDB by user ID.
 
         Args:
             userid: Wikidot user ID.
 
         Returns:
-            User document with userid, username, apprise_urls, and timezone fields,
-            or None if user not found.
+            UserInfo object, or None if user not found.
         """
-        return await self.db[COLLECTION_USERS].find_one({"userid": userid})
+        user = await self.db[COLLECTION_USERS].find_one({"userid": userid})
+        if not user:
+            return None
+        return self._user_doc_to_info(user)
+
+    async def get_user_by_username(self, username: str) -> UserInfo | None:
+        """Get a specific user from MongoDB by username.
+
+        Args:
+            username: Wikidot username.
+
+        Returns:
+            UserInfo object, or None if user not found.
+        """
+        user = await self.db[COLLECTION_USERS].find_one({"username": username})
+        if not user:
+            return None
+        return self._user_doc_to_info(user)
+
+    @staticmethod
+    def _user_doc_to_info(user: dict[str, Any]) -> UserInfo:
+        """Convert a MongoDB user document to UserInfo.
+
+        Args:
+            user: MongoDB user document.
+
+        Returns:
+            UserInfo object.
+        """
+        try:
+            mention_level = MentionLevel(user.get("mention_level", "avatarhover"))
+        except ValueError:
+            mention_level = MentionLevel.AVATARHOVER
+
+        return UserInfo(
+            userid=user["userid"],
+            username=user["username"],
+            apprise_urls=user.get("apprise_urls", []),
+            timezone=user.get("timezone", "UTC"),
+            mention_level=mention_level,
+            email=user.get("email"),
+            enable_wikidot_pm=user.get("enable_wikidot_pm", True),
+            enable_email=user.get("enable_email", True),
+            enable_apprise=user.get("enable_apprise", True),
+            subscriptions=set(user.get("subscriptions", [])),
+            unsubscriptions=set(user.get("unsubscriptions", [])),
+        )
 
     async def remove_user(self, userid: int) -> None:
         """Remove a user from MongoDB.

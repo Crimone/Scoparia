@@ -139,8 +139,8 @@ class TestMongoDBClient:
         user = await mongodb_client.get_user(123)
 
         assert user is not None
-        assert user["userid"] == 123
-        assert user["username"] == "TestUser"
+        assert user.userid == 123
+        assert user.username == "TestUser"
 
     @pytest.mark.asyncio
     async def test_get_user_not_found(self, mongodb_client: MongoDBClient) -> None:

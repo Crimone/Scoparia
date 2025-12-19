@@ -222,7 +222,7 @@ class TestScopariaCore:
 
         with patch("scoparia.core.send_email") as mock_send_email:
             mock_send_email.return_value = True
-            core._send_email_notification(user_info, posts)
+            await core._send_email_notification(user_info, posts)
             mock_send_email.assert_called_once()
             call_args = mock_send_email.call_args
             assert call_args.kwargs["to_email"] == "test@example.com"
@@ -249,8 +249,71 @@ class TestScopariaCore:
         ]
 
         with patch("scoparia.core.send_email") as mock_send_email:
-            core._send_email_notification(user_info, posts)
+            await core._send_email_notification(user_info, posts)
             mock_send_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_email_notification_error_notifies_admin(
+        self, core: ScopariaCore, sample_users: dict[int, UserInfo]
+    ) -> None:
+        """Test that email error sends notification to admin via enabled channels."""
+        user_info = sample_users[123]
+        posts = [
+            RSSForumPost(
+                post_id=123,
+                thread_id=456,
+                title="Test Post",
+                link="https://example.com",
+                author_name="TestUser",
+                content="<p>Test content</p>",
+                publish_time=datetime.now(UTC),
+                site_url="https://scp-wiki.wikidot.com",
+                parents=[],
+            )
+        ]
+
+        # Create admin UserInfo (username matches wikidot_username in config)
+        admin_user = UserInfo(
+            userid=999,
+            username="admin_user",
+            apprise_urls=[],
+            timezone="UTC",
+            mention_level=MentionLevel.AVATARHOVER,
+            email=None,
+            enable_wikidot_pm=True,
+            enable_email=True,
+            enable_apprise=False,
+            subscriptions=set(),
+            unsubscriptions=set(),
+        )
+
+        # Mock config to indicate database mode
+        mock_config = MagicMock()
+        mock_config.mongodb_uri = "mongodb://localhost"
+        mock_config.wikidot_username = "admin_user"
+
+        with (
+            patch("scoparia.core.send_email") as mock_send_email,
+            patch("scoparia.core.get_client") as mock_get_client,
+            patch("scoparia.core.get_config", return_value=mock_config),
+            patch("scoparia.core.get_mongodb") as mock_get_mongodb,
+        ):
+            mock_send_email.side_effect = RuntimeError("Email sending failed")
+            mock_client = AsyncMock()
+            mock_client.send_private_message.return_value = True
+            mock_get_client.return_value = mock_client
+
+            mock_db = AsyncMock()
+            mock_db.get_user_by_username.return_value = admin_user
+            mock_get_mongodb.return_value = mock_db
+
+            await core._send_email_notification(user_info, posts)
+
+            # Verify admin notification was sent via Wikidot PM
+            mock_client.send_private_message.assert_called_once()
+            call_args = mock_client.send_private_message.call_args
+            assert call_args.kwargs["to_user_id"] == 999
+            assert "Email sending failed" in call_args.kwargs["body"]
 
     @pytest.mark.asyncio
     async def test_send_wikidot_pm_notification(

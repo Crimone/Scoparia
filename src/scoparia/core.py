@@ -448,7 +448,7 @@ class ScopariaCore:
         except Exception as e:
             logger.error("Failed to send notification to %s: %s", user_info.username, e)
 
-    def _send_email_notification(
+    async def _send_email_notification(
         self, user_info: UserInfo, posts: list[RSSForumPost]
     ) -> None:
         """Send notification via email.
@@ -495,6 +495,68 @@ class ScopariaCore:
                 e,
                 exc_info=True,
             )
+            # Send error notification to admin user (ID: 6207446)
+            await self._send_error_to_admin(str(e))
+
+    async def _send_error_to_admin(self, error_message: str) -> None:
+        """Send error notification to admin via all enabled channels.
+
+        Fetches admin user info from database using wikidot_username from config
+        and sends notification using all channels the admin has enabled
+        (Wikidot PM, Apprise). Email is disabled to avoid infinite loop.
+
+        Args:
+            error_message: The error message to send to admin.
+        """
+        cfg = get_config()
+        admin_username = cfg.wikidot_username
+
+        if cfg.mongodb_uri is None:
+            # No-database mode: find admin by username in USERS_JSON
+            admin_info = (
+                next(
+                    (u for u in cfg.users.values() if u.username == admin_username),
+                    None,
+                )
+                if cfg.users
+                else None
+            )
+        else:
+            # Database mode: fetch admin user from MongoDB by username
+            admin_info = await get_mongodb().get_user_by_username(admin_username)
+
+        if not admin_info:
+            logger.warning("Admin user not found, cannot send error notification")
+            return
+
+        # Disable email to avoid infinite loop
+        admin_info.enable_email = False
+
+        # Create a pseudo RSSForumPost to carry the error message
+        error_post = RSSForumPost(
+            post_id=0,
+            thread_id=0,
+            title="[Scoparia Error] Email Sending Failed",
+            link="",
+            author_name="Scoparia System",
+            content=f"<p>{error_message}</p>",
+            publish_time=datetime.now(UTC),
+            site_url="",
+            parents=[],
+        )
+
+        try:
+            # Send via Apprise if enabled
+            if admin_info.enable_apprise and admin_info.apprise_urls:
+                await self._send_apprise_notification(admin_info, [error_post])
+
+            # Send via Wikidot PM if enabled
+            if admin_info.enable_wikidot_pm:
+                await self._send_wikidot_pm_notification(admin_info, [error_post])
+
+            logger.info("Sent error notification to admin")
+        except Exception as admin_e:
+            logger.error("Failed to send error notification to admin: %s", admin_e)
 
     async def _send_wikidot_pm_notification(
         self, user_info: UserInfo, posts: list[RSSForumPost]
@@ -589,7 +651,7 @@ class ScopariaCore:
         # Send email notification if enabled and email is configured
         if user_info.enable_email:
             if user_info.email:
-                self._send_email_notification(user_info, posts)
+                await self._send_email_notification(user_info, posts)
             else:
                 logger.debug(
                     "Skipping email notification for %s (no email configured)",
