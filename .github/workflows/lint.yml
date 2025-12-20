@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  lint:
+  ruff:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,8 +29,5 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install dependencies
-        run: uv sync && uv pip install basedpyright
-
       - name: Run Pyright Type Check
-        run: uv run basedpyright
+        run: uv run --with basedpyright basedpyright
