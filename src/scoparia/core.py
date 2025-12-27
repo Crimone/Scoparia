@@ -475,7 +475,7 @@ class ScopariaCore:
             )
 
             # Send email
-            success = send_email(title=title, body=body, to_email=user_info.email)
+            success = await send_email(title=title, body=body, to_email=user_info.email)
 
             if success:
                 logger.info(

@@ -1,5 +1,6 @@
 """Email sending functionality."""
 
+import asyncio
 import base64
 import os
 import re
@@ -156,8 +157,11 @@ def _get_account() -> Account:
     return _account
 
 
-def send_email(title: str, body: str, to_email: str) -> bool:
-    """Send an email via Office 365.
+def _send_email_sync(title: str, body: str, to_email: str) -> bool:
+    """Send an email via Office 365 (synchronous implementation).
+
+    This is the internal synchronous implementation. Use send_email() for
+    the async version that doesn't block the event loop.
 
     Args:
         title: Email subject/title.
@@ -168,16 +172,7 @@ def send_email(title: str, body: str, to_email: str) -> bool:
         True if email was sent successfully, False otherwise.
 
     Raises:
-        RuntimeError: If authentication fails.
-        Exception: If there's an error sending the email.
-
-    Example:
-        >>> send_email(
-        ...     title="Test Email",
-        ...     body="This is a test email.",
-        ...     to_email="recipient@example.com"
-        ... )
-        True
+        RuntimeError: If authentication fails or email sending fails.
     """
     account = _get_account()
 
@@ -203,6 +198,35 @@ def send_email(title: str, body: str, to_email: str) -> bool:
         raise RuntimeError(
             _mask_emails_in_text(f"Failed to send email to {to_email}: {e}")
         ) from None
+
+
+async def send_email(title: str, body: str, to_email: str) -> bool:
+    """Send an email via Office 365.
+
+    This async function wraps the synchronous O365 email sending in a thread
+    to avoid blocking the event loop.
+
+    Args:
+        title: Email subject/title.
+        body: Email body content.
+        to_email: Recipient email address.
+
+    Returns:
+        True if email was sent successfully, False otherwise.
+
+    Raises:
+        RuntimeError: If authentication fails.
+        Exception: If there's an error sending the email.
+
+    Example:
+        >>> await send_email(
+        ...     title="Test Email",
+        ...     body="This is a test email.",
+        ...     to_email="recipient@example.com"
+        ... )
+        True
+    """
+    return await asyncio.to_thread(_send_email_sync, title, body, to_email)
 
 
 async def flush_token_to_github() -> None:

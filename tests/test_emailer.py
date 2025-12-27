@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scoparia.emailer import _get_account, send_email
+from scoparia.emailer import _get_account, _send_email_sync, send_email
 
 
 class TestGetAccount:
@@ -111,7 +111,7 @@ class TestGetAccount:
 
 
 class TestSendEmail:
-    """Test send_email function."""
+    """Test _send_email_sync function."""
 
     @patch("scoparia.emailer._get_account")
     def test_send_email_success(self, mock_get_account: MagicMock) -> None:
@@ -127,7 +127,7 @@ class TestSendEmail:
         mock_account.mailbox.return_value = mock_mailbox
         mock_get_account.return_value = mock_account
 
-        result = send_email(
+        result = _send_email_sync(
             title="Test Subject",
             body="Test Body",
             to_email="test@example.com",
@@ -153,7 +153,7 @@ class TestSendEmail:
         mock_account.mailbox.return_value = mock_mailbox
         mock_get_account.return_value = mock_account
 
-        result = send_email(
+        result = _send_email_sync(
             title="Test Subject",
             body="Test Body",
             to_email="test@example.com",
@@ -175,7 +175,7 @@ class TestSendEmail:
         mock_account.mailbox.return_value = mock_mailbox
         mock_get_account.return_value = mock_account
 
-        result = send_email(
+        result = _send_email_sync(
             title="Test Subject",
             body="Test Body",
             to_email="test@example.com",
@@ -194,8 +194,29 @@ class TestSendEmail:
         with pytest.raises(
             RuntimeError, match=r"Failed to send email to tes\*\*\*@example\.com"
         ):
-            send_email(
+            _send_email_sync(
                 title="Test Subject",
                 body="Test Body",
                 to_email="test@example.com",
             )
+
+
+class TestSendEmailAsync:
+    """Test async send_email function."""
+
+    @pytest.mark.asyncio
+    @patch("scoparia.emailer._send_email_sync")
+    async def test_send_email_calls_sync_in_thread(self, mock_sync: MagicMock) -> None:
+        """Test that send_email wraps _send_email_sync with to_thread."""
+        mock_sync.return_value = True
+
+        result = await send_email(
+            title="Test Subject",
+            body="Test Body",
+            to_email="test@example.com",
+        )
+
+        assert result is True
+        mock_sync.assert_called_once_with(
+            "Test Subject", "Test Body", "test@example.com"
+        )
