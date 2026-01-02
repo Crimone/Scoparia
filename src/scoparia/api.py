@@ -2,12 +2,11 @@ import asyncio
 import contextlib
 import re
 import time
-from collections.abc import Iterable
 from datetime import UTC, datetime
 from enum import Enum
 from functools import wraps
 from re import Match
-from typing import Any, cast
+from typing import Any
 from urllib.parse import urlparse
 
 import aiohttp
@@ -1723,9 +1722,8 @@ class Client:
         # Extract lastBuildDate from feed
         last_build_date: datetime | None = None
         updated_parsed = getattr(feed.feed, "updated_parsed", None)
-        if updated_parsed:
-            parsed_time = cast(time.struct_time, updated_parsed)
-            last_build_date = datetime(*parsed_time[:6], tzinfo=UTC)
+        if isinstance(updated_parsed, time.struct_time):
+            last_build_date = datetime(*updated_parsed[:6], tzinfo=UTC)
             logger.debug("RSS feed lastBuildDate: %s", last_build_date.isoformat())
         else:
             # Feed parsed successfully but no timestamp available, use current time
@@ -1778,8 +1776,10 @@ class Client:
                     content_text = content_text[:second_last_pos]
 
                 # Get publish date (directly construct from struct_time)
-                parsed_time = cast(time.struct_time, entry.published_parsed)
-                publish_datetime = datetime(*parsed_time[:6], tzinfo=UTC)
+                if not isinstance(entry.published_parsed, time.struct_time):
+                    logger.warning("Post missing valid published_parsed: %s", link)
+                    continue
+                publish_datetime = datetime(*entry.published_parsed[:6], tzinfo=UTC)
 
                 # Filter by publish time if since is provided
                 if since and publish_datetime <= since:
@@ -1865,31 +1865,30 @@ class Client:
         contacts_list: list[dict[str, Any]] = []
 
         # Parse back contacts (under h2 heading)
-        back_contacts_heading = cast(Tag | None, contacts.find("h2"))
-        if back_contacts_heading is None:
+        back_contacts_heading = contacts.find("h2")
+        if not isinstance(back_contacts_heading, Tag):
             # The heading does not appear if there are no back contacts
             logger.info("No back contacts found")
             return []
 
-        back_contacts_table = cast(
-            Tag | None,
-            back_contacts_heading.find_next_sibling(class_="contact-list-table"),
+        back_contacts_table = back_contacts_heading.find_next_sibling(
+            class_="contact-list-table"
         )
-        if back_contacts_table is None:
+        if not isinstance(back_contacts_table, Tag):
             # If there is a heading there should also be a contacts table,
             # but can't hurt to be sure
             logger.info("No back contacts table found")
             return []
 
-        for row in cast(Iterable[Tag], back_contacts_table.find_all("tr")):
-            cells = list(cast(Iterable[Tag], row.find_all("td")))
+        for row in back_contacts_table.find_all("tr"):
+            if not isinstance(row, Tag):
+                continue
+            cells = [cell for cell in row.find_all("td") if isinstance(cell, Tag)]
             if len(cells) < 2:
                 continue
             nametag_cell, address_cell = cells[0], cells[1]
-            nametag_span = cast(
-                Tag | None, nametag_cell.find("span", class_="printuser")
-            )
-            if nametag_span is None:
+            nametag_span = nametag_cell.find("span", class_="printuser")
+            if not isinstance(nametag_span, Tag):
                 continue
             user = user_parse(nametag_span)
             if user.id is None or user.name is None:
