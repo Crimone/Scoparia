@@ -457,7 +457,8 @@ class ScopariaCore:
             user_info: User information with email address.
             posts: List of forum posts to notify about.
         """
-        if not user_info.email:
+        effective_email = user_info.effective_email
+        if not effective_email:
             logger.warning(
                 "User %s has no email address configured", user_info.username
             )
@@ -475,7 +476,7 @@ class ScopariaCore:
             )
 
             # Send email
-            success = await send_email(title=title, body=body, to_email=user_info.email)
+            success = await send_email(title=title, body=body, to_email=effective_email)
 
             if success:
                 logger.info(
@@ -650,7 +651,7 @@ class ScopariaCore:
 
         # Send email notification if enabled and email is configured
         if user_info.enable_email:
-            if user_info.email:
+            if user_info.effective_email:
                 await self._send_email_notification(user_info, posts)
             else:
                 logger.debug(

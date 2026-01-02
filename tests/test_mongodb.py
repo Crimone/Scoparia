@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from scoparia.api import Contact
 from scoparia.config import MentionLevel, UserInfo
 from scoparia.mongodb import MongoDBClient, get_mongodb, init_mongodb
 
@@ -39,6 +40,7 @@ class TestMongoDBClient:
                 "timezone": "UTC",
                 "mention_level": "avatarhover",
                 "email": "test@example.com",
+                "contact_email": "contact@example.com",
                 "enable_wikidot_pm": True,
                 "enable_email": True,
                 "enable_apprise": True,
@@ -50,6 +52,7 @@ class TestMongoDBClient:
                 "timezone": "Asia/Shanghai",
                 "mention_level": "all",
                 "email": None,
+                "contact_email": None,
                 "enable_wikidot_pm": True,
                 "enable_email": False,
                 "enable_apprise": False,
@@ -82,7 +85,9 @@ class TestMongoDBClient:
         assert 456 in users
         assert users[123].username == "TestUser"
         assert users[123].mention_level == MentionLevel.AVATARHOVER
+        assert users[123].contact_email == "contact@example.com"
         assert users[456].mention_level == MentionLevel.ALL
+        assert users[456].contact_email is None
 
     @pytest.mark.asyncio
     async def test_get_all_users_defaults(self, mongodb_client: MongoDBClient) -> None:
@@ -120,6 +125,7 @@ class TestMongoDBClient:
         assert users[123].timezone == "UTC"
         assert users[123].mention_level == MentionLevel.AVATARHOVER
         assert users[123].email is None
+        assert users[123].contact_email is None
         assert users[123].enable_wikidot_pm is True
         assert users[123].enable_email is True
         assert users[123].enable_apprise is True
@@ -164,8 +170,8 @@ class TestMongoDBClient:
     async def test_upsert_contacts(self, mongodb_client: MongoDBClient) -> None:
         """Test upserting contacts."""
         contacts = [
-            {"userid": 123, "username": "TestUser", "email": "test@example.com"},
-            {"userid": 456, "username": "AnotherUser", "email": "another@example.com"},
+            Contact(userid=123, username="TestUser", email="test@example.com"),
+            Contact(userid=456, username="AnotherUser", email="another@example.com"),
         ]
 
         mongodb_client.db["t_users"].bulk_write = AsyncMock()

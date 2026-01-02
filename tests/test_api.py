@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from scoparia.api import (
+    Contact,
     Link,
     RSSForumPost,
     get_client,
@@ -69,6 +70,17 @@ class TestLink:
         link = Link(text="Test Link", url="https://example.com")
         assert link.text == "Test Link"
         assert link.url == "https://example.com"
+
+
+class TestContact:
+    """Test Contact struct."""
+
+    def test_contact_creation(self) -> None:
+        """Test creating Contact."""
+        contact = Contact(userid=123, username="TestUser", email="test@example.com")
+        assert contact.userid == 123
+        assert contact.username == "TestUser"
+        assert contact.email == "test@example.com"
 
 
 class TestNormalizePostUrl:

@@ -1,12 +1,15 @@
 """MongoDB database layer for Scoparia."""
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pymongo import AsyncMongoClient, UpdateOne
 
 from . import logger
 from .config import MentionLevel, UserInfo, get_config
+
+if TYPE_CHECKING:
+    from .api import Contact
 
 DB_NAME = "db_scoparia"
 COLLECTION_USERS = "t_users"
@@ -125,6 +128,7 @@ class MongoDBClient:
             timezone=user.get("timezone", "UTC"),
             mention_level=mention_level,
             email=user.get("email"),
+            contact_email=user.get("contact_email"),
             enable_wikidot_pm=user.get("enable_wikidot_pm", True),
             enable_email=user.get("enable_email", True),
             enable_apprise=user.get("enable_apprise", True),
@@ -140,32 +144,32 @@ class MongoDBClient:
         """
         await self.db[COLLECTION_USERS].delete_one({"userid": userid})
 
-    async def upsert_contacts(self, contacts: list[dict[str, Any]]) -> None:
+    async def upsert_contacts(self, contacts: list["Contact"]) -> None:
         """Bulk upsert multiple contacts in MongoDB.
 
         This method is more efficient than calling upsert_contact multiple times
         as it performs all operations in a single database request.
 
         Args:
-            contacts: List of contact dictionaries with keys:
-                     userid (int), username (str), email (str).
+            contacts: List of Contact objects.
         """
         if not contacts:
             return
 
         operations = [
             UpdateOne(
-                {"userid": contact["userid"]},
+                {"userid": contact.userid},
                 {
                     "$set": {
-                        "username": contact["username"],
-                        "email": contact["email"],
+                        "username": contact.username,
+                        "contact_email": contact.email,
                     },
                     "$setOnInsert": {
-                        "userid": contact["userid"],
+                        "userid": contact.userid,
                         "apprise_urls": [],
                         "timezone": "Asia/Shanghai",
                         "mention_level": MentionLevel.AVATARHOVER.value,
+                        "email": None,
                         "enable_wikidot_pm": True,
                         "enable_email": True,
                         "enable_apprise": False,
@@ -208,7 +212,10 @@ class MongoDBClient:
                         "enable_apprise": user_info.enable_apprise,
                         "subscriptions": list(user_info.subscriptions),
                         "unsubscriptions": list(user_info.unsubscriptions),
-                    }
+                    },
+                    "$setOnInsert": {
+                        "contact_email": None,
+                    },
                 },
                 upsert=True,
             )
@@ -250,7 +257,15 @@ class MongoDBClient:
                         },
                         "email": {
                             "bsonType": ["string", "null"],
-                            "description": "User's email address (optional)",
+                            "description": (
+                                "User's email address (manually configured, optional)"
+                            ),
+                        },
+                        "contact_email": {
+                            "bsonType": ["string", "null"],
+                            "description": (
+                                "User's email address from Wikidot contacts (optional)"
+                            ),
                         },
                         "enable_email": {
                             "bsonType": "bool",

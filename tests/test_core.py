@@ -30,6 +30,7 @@ class TestScopariaCore:
                 timezone="UTC",
                 mention_level=MentionLevel.AVATARHOVER,
                 email="test@example.com",
+                contact_email=None,
                 enable_wikidot_pm=True,
                 enable_email=True,
                 enable_apprise=True,
@@ -41,6 +42,7 @@ class TestScopariaCore:
                 timezone="UTC",
                 mention_level=MentionLevel.ALL,
                 email=None,
+                contact_email=None,
                 enable_wikidot_pm=True,
                 enable_email=False,
                 enable_apprise=False,
@@ -232,8 +234,8 @@ class TestScopariaCore:
     async def test_send_email_notification_no_email(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
-        """Test that email notification is skipped when email is None."""
-        user_info = sample_users[456]  # This user has no email
+        """Test that email notification is skipped when effective_email is None."""
+        user_info = sample_users[456]  # This user has no email or contact_email
         posts = [
             RSSForumPost(
                 post_id=123,
@@ -251,6 +253,44 @@ class TestScopariaCore:
         with patch("scoparia.core.send_email") as mock_send_email:
             await core._send_email_notification(user_info, posts)
             mock_send_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_email_notification_uses_contact_email(
+        self, core: ScopariaCore
+    ) -> None:
+        """Test that email notification uses contact_email when email is None."""
+        user_info = UserInfo(
+            userid=789,
+            username="ContactUser",
+            apprise_urls=[],
+            timezone="UTC",
+            mention_level=MentionLevel.AVATARHOVER,
+            email=None,
+            contact_email="contact@example.com",
+            enable_wikidot_pm=True,
+            enable_email=True,
+            enable_apprise=False,
+        )
+        posts = [
+            RSSForumPost(
+                post_id=123,
+                thread_id=456,
+                title="Test Post",
+                link="https://example.com",
+                author_name="TestUser",
+                content="<p>Test content</p>",
+                publish_time=datetime.now(UTC),
+                site_url="https://scp-wiki.wikidot.com",
+                parents=[],
+            )
+        ]
+
+        with patch("scoparia.core.send_email") as mock_send_email:
+            mock_send_email.return_value = True
+            await core._send_email_notification(user_info, posts)
+            mock_send_email.assert_called_once()
+            call_args = mock_send_email.call_args
+            assert call_args.kwargs["to_email"] == "contact@example.com"
 
     @pytest.mark.asyncio
     async def test_send_email_notification_error_notifies_admin(

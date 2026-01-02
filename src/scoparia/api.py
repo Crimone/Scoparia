@@ -781,6 +781,24 @@ class User(msgspec.Struct):
     ip: str | None = None
 
 
+class Contact(msgspec.Struct):
+    """Class representing a Wikidot contact with email.
+
+    Attributes
+    ----------
+    userid : int
+        Wikidot user ID
+    username : str
+        Username of the contact
+    email : str
+        Email address of the contact
+    """
+
+    userid: int
+    username: str
+    email: str
+
+
 # ==============================================================================
 # Page classes
 # ==============================================================================
@@ -1836,7 +1854,7 @@ class Client:
             raise LoginRequiredException("Login is required to execute this function")
         return
 
-    async def get_contacts(self) -> list[dict[str, Any]]:
+    async def get_contacts(self) -> list[Contact]:
         """Get the account's back contacts list and their emails.
 
         Retrieves back contacts (users who have added this account to their
@@ -1847,9 +1865,8 @@ class Client:
 
         Returns
         -------
-        list[dict[str, Any]]
-            List of contact dictionaries with keys: userid (int), username (str),
-            email (str)
+        list[Contact]
+            List of Contact objects with userid, username, and email.
 
         Raises
         ------
@@ -1862,7 +1879,7 @@ class Client:
         )
         contacts = BeautifulSoup(response["body"], "lxml")
 
-        contacts_list: list[dict[str, Any]] = []
+        contacts_list: list[Contact] = []
 
         # Parse back contacts (under h2 heading)
         back_contacts_heading = contacts.find("h2")
@@ -1895,11 +1912,11 @@ class Client:
                 continue
             email = address_cell.get_text().strip()
             contacts_list.append(
-                {
-                    "userid": user.id,
-                    "username": user.name,
-                    "email": email,
-                }
+                Contact(
+                    userid=user.id,
+                    username=user.name,
+                    email=email,
+                )
             )
 
         logger.info(
@@ -2606,12 +2623,9 @@ async def sync_user_configs_from_wiki(
                 mention_level = MentionLevel.AVATARHOVER
 
             # Get email from form_data field (optional)
+            # Empty string means explicitly empty, overriding contact_email
             email_elem = page_elem.select_one("span.query_email")
-            if email_elem:
-                email_text = email_elem.get_text().strip()
-                email = email_text if email_text else None
-            else:
-                email = None
+            email = email_elem.get_text().strip() if email_elem else ""
 
             # Get notification enable flags
             enable_wikidot_pm = config_dict.get("enable_wikidot_pm") == "1"

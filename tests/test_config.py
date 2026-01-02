@@ -70,6 +70,7 @@ class TestUserInfo:
             timezone="UTC",
             mention_level=MentionLevel.AVATARHOVER,
             email="test@example.com",
+            contact_email="contact@example.com",
             enable_wikidot_pm=True,
             enable_email=True,
             enable_apprise=True,
@@ -82,6 +83,7 @@ class TestUserInfo:
         assert user.timezone == "UTC"
         assert user.mention_level == MentionLevel.AVATARHOVER
         assert user.email == "test@example.com"
+        assert user.contact_email == "contact@example.com"
         assert user.enable_wikidot_pm is True
         assert user.enable_email is True
         assert user.enable_apprise is True
@@ -102,11 +104,56 @@ class TestUserInfo:
         assert user.timezone == "UTC"
         assert user.mention_level == MentionLevel.AVATARHOVER
         assert user.email is None
+        assert user.contact_email is None
         assert user.enable_wikidot_pm is True
         assert user.enable_email is True
         assert user.enable_apprise is True
         assert user.subscriptions == set()
         assert user.unsubscriptions == set()
+
+    def test_effective_email_with_manual_email(self) -> None:
+        """Test effective_email returns manual email when set."""
+        user = UserInfo(
+            userid=123,
+            username="TestUser",
+            apprise_urls=[],
+            email="manual@example.com",
+            contact_email="contact@example.com",
+        )
+        assert user.effective_email == "manual@example.com"
+
+    def test_effective_email_fallback_to_contact(self) -> None:
+        """Test effective_email falls back to contact_email when email is None."""
+        user = UserInfo(
+            userid=123,
+            username="TestUser",
+            apprise_urls=[],
+            email=None,
+            contact_email="contact@example.com",
+        )
+        assert user.effective_email == "contact@example.com"
+
+    def test_effective_email_empty_string_overrides_contact(self) -> None:
+        """Test effective_email with empty string overrides contact_email."""
+        user = UserInfo(
+            userid=123,
+            username="TestUser",
+            apprise_urls=[],
+            email="",
+            contact_email="contact@example.com",
+        )
+        assert user.effective_email == ""
+
+    def test_effective_email_both_none(self) -> None:
+        """Test effective_email returns None when both are None."""
+        user = UserInfo(
+            userid=123,
+            username="TestUser",
+            apprise_urls=[],
+            email=None,
+            contact_email=None,
+        )
+        assert user.effective_email is None
 
 
 class TestLoadConfigFromEnv:

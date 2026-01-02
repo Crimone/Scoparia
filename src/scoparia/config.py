@@ -82,7 +82,9 @@ class UserInfo(msgspec.Struct):
     mention_level : MentionLevel
         Level of mention notifications to receive. Defaults to ALL
     email : str | None
-        User's email address. Defaults to None
+        User's email address (manually configured). Defaults to None
+    contact_email : str | None
+        User's email address from Wikidot contacts. Defaults to None
     enable_wikidot_pm : bool
         Whether to enable Wikidot private message notifications. Defaults to True
     enable_email : bool
@@ -106,11 +108,24 @@ class UserInfo(msgspec.Struct):
     timezone: str = "UTC"
     mention_level: MentionLevel = MentionLevel.AVATARHOVER
     email: str | None = None
+    contact_email: str | None = None
     enable_wikidot_pm: bool = True
     enable_email: bool = True
     enable_apprise: bool = True
     subscriptions: set[str] = msgspec.field(default_factory=set)
     unsubscriptions: set[str] = msgspec.field(default_factory=set)
+
+    @property
+    def effective_email(self) -> str | None:
+        """Get the effective email address for notifications.
+
+        Returns email if not None, otherwise falls back to contact_email.
+        Note: Empty string is considered a valid value that overrides contact_email.
+
+        Returns:
+            Effective email address, or None if neither is set.
+        """
+        return self.email if self.email is not None else self.contact_email
 
 
 class ScopariaConfig(msgspec.Struct):
