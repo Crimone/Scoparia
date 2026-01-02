@@ -22,19 +22,19 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp[speedups]>=3.13.2",
-    "tenacity>=9.1.2",
     "apprise>=1.9.6",
-    "feedparser>=6.0.12",
-    "msgspec[yaml]>=0.20.0",
-    "pymongo>=4.15.5",
-    "uvloop>=0.22.1; sys_platform != 'win32'",
-    "winloop>=0.4.0; sys_platform == 'win32'",
-    "html2text>=2025.4.15",
     "beautifulsoup4[lxml]>=4.14.3",
-    "o365>=2.1.8",
+    "feedparser>=6.0.12",
     "githubkit>=0.14.0",
+    "html2text>=2025.4.15",
+    "msgspec[yaml]>=0.20.0",
+    "o365>=2.1.8",
+    "pymongo>=4.15.5",
     "pynacl>=1.6.1",
     "pyyaml>=6.0.3",
+    "tenacity>=9.1.2",
+    "uvloop>=0.22.1; sys_platform != 'win32'",
+    "winloop>=0.4.0; sys_platform == 'win32'",
 ]
 
 [project.urls]
