@@ -2316,6 +2316,7 @@ async def _query_list_pages_module(
     offset: int = 0,
     category: str | None = None,
     fullname: str | None = None,
+    updated_at: str | None = None,
 ) -> list[Tag]:
     """Query ListPagesModule with specified fields and return page elements.
 
@@ -2338,6 +2339,8 @@ async def _query_list_pages_module(
         Category to filter pages by
     fullname : str | None, default None
         Specific page fullname to query
+    updated_at : str | None, default None
+        Filter pages by update time (e.g., "last 1 day", "last 7 days")
 
     Returns
     -------
@@ -2382,6 +2385,8 @@ async def _query_list_pages_module(
         query_dict["category"] = category
     if fullname:
         query_dict["fullname"] = fullname
+    if updated_at:
+        query_dict["updated_at"] = updated_at
 
     # Execute ajax request and parse
     response_body = await client.ajax(query_dict, site_url)
@@ -2394,11 +2399,11 @@ async def _query_list_pages_module(
 # ==============================================================================
 
 
-async def list_pages(
+async def _fetch_user_config_pages(
     site_url: str,
     category: str | None = None,
 ) -> list[Tag]:
-    """List pages from a Wikidot site.
+    """Fetch user configuration pages from a Wikidot site.
 
     Parameters
     ----------
@@ -2410,12 +2415,14 @@ async def list_pages(
     Returns
     -------
     list[Tag]
-        List of Tag elements representing page elements
+        List of Tag elements representing user config page elements
 
     Notes
     -----
-    This function uses ListPagesModule to fetch pages. It handles pagination
-    automatically and returns all pages.
+    This function uses ListPagesModule to fetch user configuration pages.
+    It handles pagination automatically and returns all matching pages.
+    Only pages updated in the last 1 hour are returned to reduce unnecessary
+    processing.
     """
     pages: list[Tag] = []
     offset = 0
@@ -2436,6 +2443,8 @@ async def list_pages(
                 per_page=per_page,
                 offset=offset,
                 category=category,
+                # Wikidot ListPagesModule uses "last N hours" syntax (always plural)
+                updated_at="last 1 hours",
             )
 
             if not page_elements:
@@ -2503,10 +2512,14 @@ async def sync_user_configs_from_wiki(
         user_config_category,
     )
 
-    # List all pages in the category
-    page_elements = await list_pages(config_wiki_url, category=user_config_category)
+    # Fetch user config pages in the category (only recently updated)
+    page_elements = await _fetch_user_config_pages(
+        config_wiki_url, category=user_config_category
+    )
     logger.info(
-        "Found %s pages in category %s", len(page_elements), user_config_category
+        "Found %s updated pages in category %s (last 1 hour)",
+        len(page_elements),
+        user_config_category,
     )
 
     user_infos: list[UserInfo] = []
