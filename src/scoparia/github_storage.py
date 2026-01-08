@@ -8,8 +8,14 @@ import base64
 import os
 
 from githubkit import GitHub
-from githubkit.exception import RequestFailed
+from githubkit.exception import RequestError, RequestFailed
 from nacl import encoding, public
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from . import logger
 
@@ -35,6 +41,12 @@ def _encrypt_secret(public_key: str, secret_value: str) -> str:
     return base64.b64encode(encrypted).decode("utf-8")
 
 
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    retry=retry_if_exception_type(RequestError),
+    reraise=True,
+)
 async def set_github_variable(variable_name: str, value: str) -> None:
     """Set a GitHub repository variable using GitHub Actions Variables API.
 
@@ -84,6 +96,12 @@ async def set_github_variable(variable_name: str, value: str) -> None:
             ) from e
 
 
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    retry=retry_if_exception_type(RequestError),
+    reraise=True,
+)
 async def set_github_secret(secret_name: str, value: str) -> None:
     """Set a GitHub repository secret using GitHub Actions Secrets API.
 
