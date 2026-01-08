@@ -4,10 +4,9 @@ import re
 import time
 from datetime import UTC, datetime
 from enum import Enum
-from functools import wraps
 from re import Match
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
 import aiohttp
 import feedparser
@@ -118,7 +117,7 @@ class WikidotException(Exception):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -131,7 +130,7 @@ class UnexpectedException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -144,7 +143,7 @@ class SessionCreateException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -164,7 +163,7 @@ class LoginRequiredException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -177,7 +176,7 @@ class AjaxModuleConnectorException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -197,7 +196,7 @@ class AMCHttpStatusCodeException(AjaxModuleConnectorException):
         HTTP status code that caused the error
     """
 
-    def __init__(self, message, status_code: int):
+    def __init__(self, message: str, status_code: int):
         super().__init__(message)
         self.status_code = status_code
 
@@ -218,7 +217,7 @@ class WikidotStatusCodeException(AjaxModuleConnectorException):
         Wikidot error status code
     """
 
-    def __init__(self, message, status_code: str):
+    def __init__(self, message: str, status_code: str):
         super().__init__(message)
         self.status_code = status_code
 
@@ -242,7 +241,7 @@ class ResponseDataException(AjaxModuleConnectorException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -255,7 +254,7 @@ class NotFoundException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -268,7 +267,7 @@ class TargetExistsException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -281,7 +280,7 @@ class TargetErrorException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -294,7 +293,7 @@ class ForbiddenException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -307,7 +306,7 @@ class NoElementException(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
 
 
@@ -320,79 +319,8 @@ class NeedsSanitizationError(WikidotException):
         Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
-
-
-# ==============================================================================
-# Decorators
-# ==============================================================================
-
-
-def login_required(func):
-    """Decorator for methods/functions that require login.
-
-    This decorator automatically checks login status before execution.
-    Raises LoginRequiredException if not logged in.
-
-    Client instance is searched in the following priority:
-    1. 'client' named argument
-    2. Any argument that is a Client instance
-    3. self.client (caller object's attribute)
-    4. self's attribute's client attribute (e.g., self.site.client)
-
-    Parameters
-    ----------
-    func : callable
-        Function or method to decorate
-
-    Returns
-    -------
-    callable
-        Wrapped function or method
-
-    Raises
-    ------
-    ValueError
-        If client instance is not found
-    LoginRequiredException
-        If not logged in (via client.login_check())
-    """
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        client = None
-        if "client" in kwargs:
-            client = kwargs["client"]
-        else:
-            for arg in args:
-                if isinstance(arg, Client):
-                    client = arg
-                    break
-
-            # Check if exists in self?
-            if client is None and args:
-                if hasattr(args[0], "client"):
-                    client = args[0].client
-                else:
-                    # Search for client in self's attributes
-                    for attr_name in dir(args[0]):
-                        if attr_name.startswith("_"):
-                            continue
-                        attr = getattr(args[0], attr_name)
-                        if hasattr(attr, "client"):
-                            client = attr.client
-                            if isinstance(client, Client):
-                                break
-
-        if client is None:
-            raise ValueError("Client is not found")
-
-        client.login_check()
-
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 # ==============================================================================
@@ -439,7 +367,7 @@ class AjaxRequestHeader:
             self.cookie.update(cookie)
         return
 
-    def set_cookie(self, name, value) -> None:
+    def set_cookie(self, name: str, value: str) -> None:
         """Set a cookie.
 
         Parameters
@@ -452,7 +380,7 @@ class AjaxRequestHeader:
         self.cookie[name] = value
         return
 
-    def delete_cookie(self, name) -> None:
+    def delete_cookie(self, name: str) -> None:
         """Delete a cookie.
 
         Parameters
@@ -463,7 +391,7 @@ class AjaxRequestHeader:
         del self.cookie[name]
         return
 
-    def get_header(self) -> dict:
+    def get_header(self) -> dict[str, str]:
         """Get constructed HTTP header.
 
         Returns
@@ -591,7 +519,7 @@ def user_parse(elem: Tag) -> "User":
         return User(
             type=UserType.GUEST,
             name=guest_name,
-            avatar_url=str(avatar_url) if avatar_url else None,
+            avatar_url=str(avatar_url) if avatar_url else "",
         )
 
     if elem.get_text() == "Wikidot":
@@ -761,24 +689,24 @@ class User(msgspec.Struct):
     ----------
     type : UserType
         Type of user (user, deleted, anonymous, guest, wikidot)
-    id : int | None
-        User ID (None for anonymous, guest, or system users)
-    name : str | None
-        Username
-    unix_name : str | None
-        UNIX format name used in user URL (None for guest users)
-    avatar_url : str | None
-        User avatar image URL
-    ip : str | None
-        User IP address (only set for anonymous users)
+    id : int
+        User ID (0 for anonymous, guest, or system users)
+    name : str
+        Username (empty string if not available)
+    unix_name : str
+        UNIX format name used in user URL (empty string for guest users)
+    avatar_url : str
+        User avatar image URL (empty string if not available)
+    ip : str
+        User IP address (only set for anonymous users, otherwise empty)
     """
 
     type: UserType
-    id: int | None = None
-    name: str | None = None
-    unix_name: str | None = None
-    avatar_url: str | None = None
-    ip: str | None = None
+    id: int = 0
+    name: str = ""
+    unix_name: str = ""
+    avatar_url: str = ""
+    ip: str = ""
 
 
 class Contact(msgspec.Struct):
@@ -1081,7 +1009,7 @@ class ForumPost(msgspec.Struct):
     text: str
     created_by: "User"
     created_at: datetime
-    element: BeautifulSoup
+    element: Tag
     edited_by: "User | None" = None
     edited_at: datetime | None = None
     parents: list["ForumPost"] = msgspec.field(default_factory=list)
@@ -1132,6 +1060,60 @@ class ForumThread(msgspec.Struct):
     page_fullname: str | None = None
 
     @staticmethod
+    def _parse_thread_category(bc_elem: Tag) -> ForumCategory:
+        """Parse thread category from breadcrumbs element.
+
+        Args:
+            bc_elem: Breadcrumbs element.
+
+        Returns:
+            ForumCategory object.
+
+        Raises:
+            NoElementException: If category is not found.
+        """
+        category_elem = bc_elem.select_one("a[href^='/forum/c-']")
+        if category_elem is None:
+            raise NoElementException("Category link is not found in breadcrumbs.")
+
+        href_attr = category_elem.get("href")
+        if href_attr is None:
+            raise NoElementException("Category element does not have href attribute")
+        href = str(href_attr)
+
+        category_id_match = re.search(r"/forum/c-(\d+)/?", href)
+        if category_id_match is None:
+            raise NoElementException(f"Invalid category href format: {href}")
+        category_id = int(category_id_match.group(1))
+
+        category_title = category_elem.get_text().strip()
+        return ForumCategory(id=category_id, title=category_title)
+
+    @staticmethod
+    def _parse_thread_page_fullname(html: BeautifulSoup) -> str | None:
+        """Parse page fullname from thread HTML.
+
+        Args:
+            html: BeautifulSoup HTML to parse.
+
+        Returns:
+            Page fullname if found, None otherwise.
+        """
+        description_block_elem = html.select_one("div.description-block")
+        if description_block_elem is None:
+            return None
+
+        page_links = description_block_elem.select("a[href^='/']")
+        for page_link in page_links:
+            page_href = page_link.get("href", "")
+            page_fullname_candidate = str(page_href).removeprefix("/")
+            if not page_fullname_candidate.startswith(
+                "forum"
+            ) and not page_fullname_candidate.startswith("feed"):
+                return page_fullname_candidate
+        return None
+
+    @staticmethod
     def _parse_thread_page(html: BeautifulSoup, site_url: str) -> "ForumThread":
         """Extract thread information from thread page HTML.
 
@@ -1155,14 +1137,13 @@ class ForumThread(msgspec.Struct):
         NoElementException
             If required HTML elements are not found
         """
-        # title retrieval processing
-        # Get last NavigableString of forum-breadcrumbs
+        # Get breadcrumbs element and title
         bc_elem = html.select_one("div.forum-breadcrumbs")
         if bc_elem is None:
             raise NoElementException("Breadcrumbs element is not found.")
         title = bc_elem.contents[-1].text.strip().removeprefix("» ")
 
-        # description retrieval processing
+        # Get description
         description_block_elem = html.select_one("div.description-block")
         if description_block_elem is None:
             raise NoElementException("Description block element is not found.")
@@ -1174,34 +1155,31 @@ class ForumThread(msgspec.Struct):
             ]
         )
 
-        # created_by retrieval processing
+        # Get created_by
         user_elem = html.select_one("div.statistics span.printuser")
         if user_elem is None:
             raise NoElementException("User element is not found.")
         created_by = user_parse(user_elem)
 
-        # created_at retrieval processing
+        # Get created_at
         odate_elem = html.select_one("div.statistics span.odate")
         if odate_elem is None:
             raise NoElementException("Odate element is not found.")
         created_at = odate_parse(odate_elem)
 
-        # post_count retrieval processing
-        # Text before 3rd br
+        # Get post_count
         br_tags = html.select("div.statistics br")
         if len(br_tags) < 3:
             raise NoElementException("Br tags are not enough.")
         post_count_elem = br_tags[2].previous_sibling
         if post_count_elem is None:
             raise NoElementException("Posts count element is not found.")
-        post_count_text = str(post_count_elem)
-        post_count_match = re.search(r"(\d+)", post_count_text)
+        post_count_match = re.search(r"(\d+)", str(post_count_elem))
         if post_count_match is None:
             raise NoElementException("Post count is not found.")
         post_count = int(post_count_match.group(1))
 
-        # id retrieval processing
-        # Search entire document for WIKIDOT.forumThreadId = xxxxxx;
+        # Get thread_id from script
         script_elem = html.find(
             "script", text=re.compile(r"WIKIDOT.forumThreadId = \d+;")
         )
@@ -1212,46 +1190,9 @@ class ForumThread(msgspec.Struct):
             raise NoElementException("Thread ID is not found in script.")
         thread_id = int(thread_id_match.group(1))
 
-        # Retrieve category
-        # Get category link from forum-breadcrumbs (matches /forum/c- pattern)
-        # bc_elem is guaranteed to be not None from earlier check
-        category_elem = bc_elem.select_one("a[href^='/forum/c-']")
-        if category_elem is None:
-            raise NoElementException("Category link is not found in breadcrumbs.")
-
-        # Parse category from link element
-        href_attr = category_elem.get("href")
-        if href_attr is None:
-            raise NoElementException("Category element does not have href attribute")
-        href = str(href_attr)
-
-        # Extract category ID from href (format: /forum/c-675245/)
-        category_id_match = re.search(r"/forum/c-(\d+)/?", href)
-        if category_id_match is None:
-            raise NoElementException(f"Invalid category href format: {href}")
-        category_id = int(category_id_match.group(1))
-
-        # Get category title from link text
-        category_title = category_elem.get_text().strip()
-
-        category = ForumCategory(id=category_id, title=category_title)
-
-        # Retrieve page_fullname
-        # Get related page from description-block
-        page_fullname = None
-        if description_block_elem is not None:
-            # Find all links that start with / but not forum/ or feed/
-            page_links = description_block_elem.select("a[href^='/']")
-            for page_link in page_links:
-                page_href = page_link.get("href", "")
-                # Remove leading slash
-                page_fullname_candidate = str(page_href).removeprefix("/")
-                # Only set if it's not a forum/feed/javascript link
-                if not page_fullname_candidate.startswith(
-                    "forum"
-                ) and not page_fullname_candidate.startswith("feed"):
-                    page_fullname = page_fullname_candidate
-                    break
+        # Parse category and page fullname using helper functions
+        category = ForumThread._parse_thread_category(bc_elem)
+        page_fullname = ForumThread._parse_thread_page_fullname(html)
 
         return ForumThread(
             site_url=site_url,
@@ -1363,7 +1304,10 @@ class ForumThread(msgspec.Struct):
 
             # Parse the target post
             target_post_container = target_post_elem.parent
-            target_post, _ = self._parse_post_from_container(
+            if not isinstance(target_post_container, Tag):
+                logger.debug("Post container is not a Tag for post %s", post_id)
+                return None
+            target_post = self._parse_post_from_container(
                 target_post_elem, target_post_container, self.id, self.site_url
             )
 
@@ -1371,24 +1315,24 @@ class ForumThread(msgspec.Struct):
             parent_chain: list[ForumPost] = []
             current_container = target_post_container
 
-            while current_container is not None:
+            while isinstance(current_container, Tag):
                 # Find parent post-container
                 parent_container = current_container.find_parent(
                     "div", class_="post-container"
                 )
-                if parent_container is None:
+                if not isinstance(parent_container, Tag):
                     break
 
                 # Find the post element within this parent container
                 parent_post_elem = parent_container.select_one("div.post")
-                if parent_post_elem is None:
+                if not isinstance(parent_post_elem, Tag):
                     break
 
                 # Parse the parent post
                 # Note: We don't know parent's thread_id, but we can get it
                 # from the post. For now, use the same thread_id
                 # (parent should be in same thread)
-                parent_post, _ = self._parse_post_from_container(
+                parent_post = self._parse_post_from_container(
                     parent_post_elem, parent_container, self.id, self.site_url
                 )
                 parent_chain.append(parent_post)
@@ -1417,11 +1361,11 @@ class ForumThread(msgspec.Struct):
 
     @staticmethod
     def _parse_post_from_container(
-        post_elem,
-        post_container,
+        post_elem: Tag,
+        post_container: Tag,
         thread_id: int,
         site_url: str,
-    ) -> tuple["ForumPost", int | None]:
+    ) -> "ForumPost":
         """Parse a ForumPost from post element and container.
 
         Parameters
@@ -1437,8 +1381,8 @@ class ForumThread(msgspec.Struct):
 
         Returns
         -------
-        tuple[ForumPost, int | None]
-            Tuple of (ForumPost object, parent_post_id)
+        ForumPost
+            Parsed ForumPost object
 
         Raises
         ------
@@ -1485,19 +1429,6 @@ class ForumThread(msgspec.Struct):
                 edited_by = user_parse(edited_user_elem)
                 edited_at = odate_parse(edited_odate_elem)
 
-        # Get parent post ID if exists
-        parent_post_id_val = None
-        if post_container is not None:
-            parent_container = post_container.find_parent(
-                "div", class_="post-container"
-            )
-            if parent_container is not None:
-                parent_container_id = parent_container.get("id")
-                if parent_container_id:
-                    parent_id_str = str(parent_container_id).removeprefix("fpc-")
-                    if parent_id_str.isdigit():
-                        parent_post_id_val = int(parent_id_str)
-
         post = ForumPost(
             site_url=site_url,
             thread_id=thread_id,
@@ -1512,7 +1443,7 @@ class ForumThread(msgspec.Struct):
             parents=[],
         )
 
-        return post, parent_post_id_val
+        return post
 
 
 # ==============================================================================
@@ -1698,6 +1629,113 @@ class Client:
 
         return response_body
 
+    def _get_feed_build_date(self, feed: feedparser.FeedParserDict) -> datetime:
+        """Extract lastBuildDate from feed.
+
+        Args:
+            feed: Parsed feedparser FeedParserDict.
+
+        Returns:
+            Feed's lastBuildDate or current time if not available.
+        """
+        updated_parsed = getattr(feed.feed, "updated_parsed", None)
+        if isinstance(updated_parsed, time.struct_time):
+            build_date = datetime(*updated_parsed[:6], tzinfo=UTC)
+            logger.debug("RSS feed lastBuildDate: %s", build_date.isoformat())
+            return build_date
+
+        # Feed parsed successfully but no timestamp available, use current time
+        build_date = datetime.now(UTC)
+        logger.debug(
+            "No lastBuildDate in RSS feed, using current time: %s",
+            build_date.isoformat(),
+        )
+        return build_date
+
+    def _parse_rss_entry(
+        self,
+        entry: feedparser.util.FeedParserDict,
+        feed_scheme: str,
+        parsed_rss_url: ParseResult,
+        since: datetime | None,
+    ) -> RSSForumPost | None:
+        """Parse a single RSS entry into RSSForumPost.
+
+        Args:
+            entry: RSS feed entry.
+            feed_scheme: URL scheme (http/https).
+            parsed_rss_url: Parsed RSS feed URL.
+            since: Filter posts after this time, or None.
+
+        Returns:
+            RSSForumPost if parsed successfully, None otherwise.
+        """
+        title = str(entry.title)
+        link = str(entry.link)
+
+        # Normalize link scheme to match RSS feed URL scheme
+        parsed_link = urlparse(link)
+        parsed_link = parsed_link._replace(scheme=feed_scheme)
+        link = parsed_link.geturl()
+
+        # Get author name
+        author_name = str(entry.wikidot_authorname)
+
+        # Get content
+        content_text = str(entry.content[0].value).strip()
+
+        # Normalize URLs in content
+        site_domain = parsed_link.netloc
+        if feed_scheme == "https":
+            content_text = content_text.replace(
+                f"http://{site_domain}", f"https://{site_domain}"
+            )
+
+        # Remove forum category and thread links from content
+        br_pattern = r"<br\s*/?>"
+        br_matches: list[Match[str]] = list(re.finditer(br_pattern, content_text))
+        if len(br_matches) >= 2:
+            second_last_pos = br_matches[-2].start()
+            content_text = content_text[:second_last_pos]
+
+        # Get publish date
+        if not isinstance(entry.published_parsed, time.struct_time):
+            logger.warning("Post missing valid published_parsed: %s", link)
+            return None
+        publish_datetime = datetime(*entry.published_parsed[:6], tzinfo=UTC)
+
+        # Filter by publish time
+        if since and publish_datetime <= since:
+            return None
+
+        # Parse post_id from URL fragment
+        if not parsed_link.fragment:
+            logger.warning("Post missing fragment in URL: %s", link)
+            return None
+        post_id = int(parsed_link.fragment.removeprefix("post-"))
+
+        # Parse thread_id from URL path
+        thread_match = re.search(r"t-(\d+)", parsed_link.path)
+        if not thread_match:
+            logger.warning("Post missing thread_id in URL: %s", link)
+            return None
+        thread_id = int(thread_match.group(1))
+
+        # Extract site URL
+        site_url_value = f"{parsed_rss_url.scheme}://{parsed_rss_url.netloc}"
+
+        return RSSForumPost(
+            post_id=post_id,
+            thread_id=thread_id,
+            title=title,
+            link=link,
+            author_name=author_name,
+            content=content_text,
+            publish_time=publish_datetime,
+            site_url=site_url_value,
+            parents=[],
+        )
+
     async def fetch_rss_posts(
         self, site_url: str, since: datetime | None = None
     ) -> tuple[list["RSSForumPost"], datetime]:
@@ -1724,114 +1762,33 @@ class Client:
         RuntimeError
             If client is not initialized or RSS feed parsing fails.
         """
-        # Construct RSS feed URL
         rss_feed_url = f"{site_url}/feed/forum/posts.xml"
 
         logger.info("Fetching RSS feed from %s", rss_feed_url)
         if since:
             logger.info("Filtering posts since: %s", since.isoformat())
 
-        # Fetch RSS feed with automatic retry
+        # Fetch and parse RSS feed
         content = await self._request("GET", rss_feed_url)
-
-        # Parse RSS feed using feedparser
         feed = feedparser.parse(content)
 
-        # Extract lastBuildDate from feed
-        last_build_date: datetime | None = None
-        updated_parsed = getattr(feed.feed, "updated_parsed", None)
-        if isinstance(updated_parsed, time.struct_time):
-            last_build_date = datetime(*updated_parsed[:6], tzinfo=UTC)
-            logger.debug("RSS feed lastBuildDate: %s", last_build_date.isoformat())
-        else:
-            # Feed parsed successfully but no timestamp available, use current time
-            last_build_date = datetime.now(UTC)
-            logger.debug(
-                "No lastBuildDate in RSS feed, using current time: %s",
-                last_build_date.isoformat(),
-            )
+        # Get feed build date
+        last_build_date = self._get_feed_build_date(feed)
 
         # Extract scheme from RSS feed URL
         parsed_rss_url = urlparse(rss_feed_url)
         feed_scheme = parsed_rss_url.scheme
 
+        # Parse entries
         posts: list[RSSForumPost] = []
         for entry in feed.entries:
             if not isinstance(entry, feedparser.util.FeedParserDict):
                 continue
 
             try:
-                title = str(entry.title)
-                link = str(entry.link)
-
-                # Normalize link scheme to match RSS feed URL scheme
-                parsed_link = urlparse(link)
-                parsed_link = parsed_link._replace(scheme=feed_scheme)
-                link = parsed_link.geturl()
-
-                # Get author name (wikidot:authorName)
-                author_name = str(entry.wikidot_authorname)
-
-                # Get content (content:encoded or summary)
-                content_text = str(entry.content[0].value).strip()
-
-                # Normalize URLs in content to match RSS feed URL scheme
-                site_domain = parsed_link.netloc
-                if feed_scheme == "https":
-                    # Replace http://site.domain with https://site.domain
-                    content_text = content_text.replace(
-                        f"http://{site_domain}", f"https://{site_domain}"
-                    )
-
-                # Remove forum category and thread links from content
-                # Find all <br/> tags and remove from second-to-last onwards
-                br_pattern = r"<br\s*/?>"
-                br_matches = list[Match[str]](re.finditer(br_pattern, content_text))
-
-                if len(br_matches) >= 2:
-                    # Remove from the second-to-last <br/> onwards
-                    second_last_pos = br_matches[-2].start()
-                    content_text = content_text[:second_last_pos]
-
-                # Get publish date (directly construct from struct_time)
-                if not isinstance(entry.published_parsed, time.struct_time):
-                    logger.warning("Post missing valid published_parsed: %s", link)
-                    continue
-                publish_datetime = datetime(*entry.published_parsed[:6], tzinfo=UTC)
-
-                # Filter by publish time if since is provided
-                if since and publish_datetime <= since:
-                    continue
-
-                # Parse post_id from URL fragment (required)
-                if not parsed_link.fragment:
-                    logger.warning("Post missing fragment in URL: %s", link)
-                    continue
-                post_id = int(parsed_link.fragment.removeprefix("post-"))
-
-                # Parse thread_id from URL path (required)
-                thread_match = re.search(r"t-(\d+)", parsed_link.path)
-                if not thread_match:
-                    logger.warning("Post missing thread_id in URL: %s", link)
-                    continue
-                thread_id = int(thread_match.group(1))
-
-                # Extract site URL from RSS feed URL
-                site_url_value = f"{parsed_rss_url.scheme}://{parsed_rss_url.netloc}"
-
-                posts.append(
-                    RSSForumPost(
-                        post_id=post_id,
-                        thread_id=thread_id,
-                        title=title,
-                        link=link,
-                        author_name=author_name,
-                        content=content_text,
-                        publish_time=publish_datetime,
-                        site_url=site_url_value,
-                        parents=[],
-                    )
-                )
+                post = self._parse_rss_entry(entry, feed_scheme, parsed_rss_url, since)
+                if post is not None:
+                    posts.append(post)
             except Exception as e:
                 logger.warning("Failed to parse RSS entry: %s", e)
                 continue
@@ -1908,7 +1865,7 @@ class Client:
             if not isinstance(nametag_span, Tag):
                 continue
             user = user_parse(nametag_span)
-            if user.id is None or user.name is None:
+            if not user.id or not user.name:
                 continue
             email = address_cell.get_text().strip()
             contacts_list.append(
@@ -2065,6 +2022,134 @@ class Client:
             logger.error("Error deleting page %s: %s", fullname, e, exc_info=True)
             return False
 
+    async def _get_page_source(
+        self, site_url: str, page_id: int, fullname: str
+    ) -> str | None:
+        """Get page source from Wikidot.
+
+        Args:
+            site_url: Site URL where the page belongs.
+            page_id: Page ID.
+            fullname: Page fullname for logging.
+
+        Returns:
+            Page source text, or None if not found.
+        """
+        view_source_response = await self.ajax(
+            {
+                "page_id": page_id,
+                "moduleName": "viewsource/ViewSourceModule",
+            },
+            site_url,
+        )
+
+        body_html = view_source_response.get("body", "")
+        soup = BeautifulSoup(body_html, "lxml")
+        source_elem = soup.select_one("div.page-source")
+        if source_elem is None:
+            logger.warning("Page source not found for %s", fullname)
+            return None
+
+        return source_elem.get_text().strip()
+
+    def _fix_multiline_fields(
+        self, config: dict[str, Any]
+    ) -> tuple[bool, dict[str, Any]]:
+        """Fix multiline fields by adding trailing newlines.
+
+        Args:
+            config: YAML config dictionary.
+
+        Returns:
+            Tuple of (needs_fix, modified_config).
+        """
+        fields_to_check = ["apprise_urls", "subscriptions", "unsubscriptions"]
+        needs_fix = False
+
+        for field in fields_to_check:
+            value = config.get(field, "")
+            # Single-line: non-empty, no \n inside, needs trailing \n
+            if value and "\n" not in value:
+                config[field] = value + "\n"
+                needs_fix = True
+
+        return needs_fix, config
+
+    async def _save_page(
+        self,
+        site_url: str,
+        fullname: str,
+        page_id: int,
+        fixed_source: str,
+    ) -> bool:
+        """Save page with lock acquisition.
+
+        Args:
+            site_url: Site URL where the page belongs.
+            fullname: Page fullname.
+            page_id: Page ID.
+            fixed_source: Fixed page source to save.
+
+        Returns:
+            True if save was successful, False otherwise.
+        """
+        # Acquire page lock
+        page_lock_response = await self.ajax(
+            {
+                "mode": "page",
+                "wiki_page": fullname,
+                "page_id": page_id,
+                "moduleName": "edit/PageEditModule",
+            },
+            site_url,
+        )
+
+        # Skip if page is locked by another user
+        if "locked" in page_lock_response or "other_locks" in page_lock_response:
+            logger.info("Page %s is locked, skipping sanitization", fullname)
+            return False
+
+        # Get lock credentials and revision ID
+        lock_id = page_lock_response["lock_id"]
+        lock_secret = page_lock_response["lock_secret"]
+        page_revision_id = page_lock_response.get("page_revision_id", "")
+
+        # Get title from page lock response body
+        lock_body_html = page_lock_response.get("body", "")
+        lock_soup = BeautifulSoup(lock_body_html, "lxml")
+        title_input = lock_soup.select_one("input#edit-page-title")
+        title = title_input.get("value", "") if title_input else ""
+
+        # Save the page
+        edit_body: dict[str, Any] = {
+            "action": "WikiPageAction",
+            "event": "savePage",
+            "moduleName": "Empty",
+            "mode": "page",
+            "lock_id": lock_id,
+            "lock_secret": lock_secret,
+            "revision_id": page_revision_id,
+            "wiki_page": fullname,
+            "page_id": page_id,
+            "title": title,
+            "source": fixed_source,
+            "comments": "Auto-sanitize multiline fields",
+        }
+
+        response = await self.ajax(edit_body, site_url)
+
+        if response.get("status") == "ok":
+            logger.info("Successfully sanitized page %s (ID: %s)", fullname, page_id)
+            return True
+
+        logger.warning(
+            "Failed to sanitize page %s (ID: %s): %s",
+            fullname,
+            page_id,
+            response.get("message", "Unknown error"),
+        )
+        return False
+
     async def sanitize_page(
         self,
         site_url: str,
@@ -2100,23 +2185,9 @@ class Client:
                 raise NotFoundException(f"Page not found: {fullname}")
 
             # Get page source
-            view_source_response = await self.ajax(
-                {
-                    "page_id": page_id,
-                    "moduleName": "viewsource/ViewSourceModule",
-                },
-                site_url,
-            )
-
-            # Parse source from response body
-            body_html = view_source_response.get("body", "")
-            soup = BeautifulSoup(body_html, "lxml")
-            source_elem = soup.select_one("div.page-source")
-            if source_elem is None:
-                logger.warning("Page source not found for %s", fullname)
+            source = await self._get_page_source(site_url, page_id, fullname)
+            if source is None:
                 return False
-
-            source = source_elem.get_text().strip()
 
             # Parse YAML to check multiline fields
             try:
@@ -2129,17 +2200,8 @@ class Client:
                 logger.warning("Page %s config is not a dict", fullname)
                 return False
 
-            # Check if any single-line field needs sanitization
-            # Only single-line non-empty values need trailing \n
-            fields_to_check = ["apprise_urls", "subscriptions", "unsubscriptions"]
-            needs_fix = False
-
-            for field in fields_to_check:
-                value = config.get(field, "")
-                # Single-line: non-empty, no \n inside, needs trailing \n
-                if value and "\n" not in value:
-                    config[field] = value + "\n"
-                    needs_fix = True
+            # Check and fix multiline fields
+            needs_fix, config = self._fix_multiline_fields(config)
 
             if not needs_fix:
                 logger.debug("Page %s does not need sanitization", fullname)
@@ -2157,64 +2219,7 @@ class Client:
                 config, Dumper=dumper, allow_unicode=True, sort_keys=False
             )
 
-            # Acquire page lock
-            page_lock_response = await self.ajax(
-                {
-                    "mode": "page",
-                    "wiki_page": fullname,
-                    "page_id": page_id,
-                    "moduleName": "edit/PageEditModule",
-                },
-                site_url,
-            )
-
-            # Skip if page is locked by another user
-            if "locked" in page_lock_response or "other_locks" in page_lock_response:
-                logger.info("Page %s is locked, skipping sanitization", fullname)
-                return False
-
-            # Get lock credentials and revision ID
-            lock_id = page_lock_response["lock_id"]
-            lock_secret = page_lock_response["lock_secret"]
-            page_revision_id = page_lock_response.get("page_revision_id", "")
-
-            # Get title from page lock response body
-            lock_body_html = page_lock_response.get("body", "")
-            lock_soup = BeautifulSoup(lock_body_html, "lxml")
-            title_input = lock_soup.select_one("input#edit-page-title")
-            title = title_input.get("value", "") if title_input else ""
-
-            # Save the page
-            edit_body: dict[str, Any] = {
-                "action": "WikiPageAction",
-                "event": "savePage",
-                "moduleName": "Empty",
-                "mode": "page",
-                "lock_id": lock_id,
-                "lock_secret": lock_secret,
-                "revision_id": page_revision_id,
-                "wiki_page": fullname,
-                "page_id": page_id,
-                "title": title,
-                "source": fixed_source,
-                "comments": "Auto-sanitize multiline fields",
-            }
-
-            response = await self.ajax(edit_body, site_url)
-
-            if response.get("status") == "ok":
-                logger.info(
-                    "Successfully sanitized page %s (ID: %s)", fullname, page_id
-                )
-                return True
-            else:
-                logger.warning(
-                    "Failed to sanitize page %s (ID: %s): %s",
-                    fullname,
-                    page_id,
-                    response.get("message", "Unknown error"),
-                )
-                return False
+            return await self._save_page(site_url, fullname, page_id, fixed_source)
 
         except NotFoundException:
             raise
@@ -2467,6 +2472,168 @@ async def _fetch_user_config_pages(
     return pages
 
 
+async def _validate_page_creator(
+    page_elem: Tag,
+    page_name: str,
+    config_wiki_url: str,
+    user_config_category: str,
+) -> User | None:
+    """Validate page creator and return User if valid.
+
+    Args:
+        page_elem: BeautifulSoup page element.
+        page_name: Name of the page.
+        config_wiki_url: URL of the configuration wiki.
+        user_config_category: Category name for user config pages.
+
+    Returns:
+        User object if valid, None otherwise.
+        May delete the page if creator is invalid/deleted.
+    """
+    created_by_elem = page_elem.select_one(
+        "span.query_created_by_linked span.printuser"
+    )
+    if created_by_elem is None:
+        # Check if user was deleted
+        created_by_container = page_elem.select_one("span.query_created_by_linked")
+        if created_by_container is not None:
+            container_text = created_by_container.get_text().strip()
+            if container_text == "(user deleted)":
+                logger.info(
+                    "Page %s created by deleted user, deleting page",
+                    page_name,
+                )
+                await get_client().delete_page(
+                    config_wiki_url, f"{user_config_category}:{page_name}"
+                )
+                return None
+
+        logger.warning("Page %s missing created_by_linked element, skipping", page_name)
+        return None
+
+    try:
+        created_by_user = user_parse(created_by_elem)
+    except Exception as e:
+        logger.warning(
+            "Page %s failed to parse created_by_linked: %s, skipping",
+            page_name,
+            e,
+        )
+        return None
+
+    # Verify that the creator matches the name (page_name is user ID)
+    try:
+        page_name_id = int(page_name)
+    except ValueError:
+        logger.warning("Page name %s is not a valid user ID, skipping", page_name)
+        return None
+
+    if not created_by_user.id or created_by_user.id != page_name_id:
+        logger.warning(
+            "Page %s created by user ID %s, does not match page name "
+            "(user ID), attempting to delete page",
+            page_name,
+            created_by_user.id,
+        )
+        await get_client().delete_page(
+            config_wiki_url, f"{user_config_category}:{page_name}"
+        )
+        return None
+
+    if not created_by_user.name:
+        logger.warning("Page %s created_by_user has no name, skipping", page_name)
+        return None
+
+    return created_by_user
+
+
+def _parse_user_config_from_page(
+    page_elem: Tag, page_name: str, creator: User
+) -> UserInfo:
+    """Parse user configuration from page element.
+
+    Args:
+        page_elem: BeautifulSoup page element.
+        page_name: Name of the page for logging.
+        creator: User who created the page.
+
+    Returns:
+        UserInfo object parsed from page.
+
+    Raises:
+        NeedsSanitizationError: If page has malformed fields.
+        ValueError: If content element is missing.
+    """
+    # Get content from page element (YAML content)
+    content_elem = page_elem.select_one("span.query_content")
+    if content_elem is None:
+        raise ValueError(f"Page {page_name} missing content element")
+
+    raw_config = content_elem.get_text().strip()
+
+    # Parse YAML config using msgspec
+    try:
+        config_dict = msgspec.yaml.decode(raw_config)
+    except Exception as e:
+        raise NeedsSanitizationError(f"Invalid YAML format for page {page_name}") from e
+
+    # Get apprise_urls from form_data field (default to empty list)
+    apprise_urls = extract_lines_from_page_element(page_elem, "apprise_urls")
+
+    # Get timezone (default to UTC)
+    timezone = config_dict.get("timezone", "UTC")
+    if not isinstance(timezone, str):
+        timezone = "UTC"
+
+    # Get mention_level (default to AVATARHOVER)
+    mention_level_str = config_dict.get("mention_level", "avatarhover")
+    if not isinstance(mention_level_str, str):
+        mention_level_str = "avatarhover"
+    try:
+        mention_level = MentionLevel(mention_level_str.lower())
+    except ValueError:
+        mention_level = MentionLevel.AVATARHOVER
+
+    # Get email from form_data field (optional)
+    email_elem = page_elem.select_one("span.query_email")
+    email = email_elem.get_text().strip() if email_elem else ""
+
+    # Get notification enable flags
+    enable_wikidot_pm = config_dict.get("enable_wikidot_pm") == "1"
+    enable_email = config_dict.get("enable_email") == "1"
+    enable_apprise = config_dict.get("enable_apprise") == "1"
+
+    # Get subscriptions from form_data field (default to empty set)
+    subscription_lines = extract_lines_from_page_element(page_elem, "subscriptions")
+    subscriptions = {
+        normalized
+        for line in subscription_lines
+        if (normalized := normalize_post_url(line)) is not None
+    }
+
+    # Get unsubscriptions from form_data field (default to empty set)
+    unsubscription_lines = extract_lines_from_page_element(page_elem, "unsubscriptions")
+    unsubscriptions = {
+        normalized
+        for line in unsubscription_lines
+        if (normalized := normalize_post_url(line)) is not None
+    }
+
+    return UserInfo(
+        userid=creator.id,
+        username=creator.name,
+        apprise_urls=apprise_urls,
+        timezone=timezone,
+        mention_level=mention_level,
+        email=email,
+        enable_wikidot_pm=enable_wikidot_pm,
+        enable_email=enable_email,
+        enable_apprise=enable_apprise,
+        subscriptions=subscriptions,
+        unsubscriptions=unsubscriptions,
+    )
+
+
 async def sync_user_configs_from_wiki(
     config_wiki_url: str,
     user_config_category: str,
@@ -2534,157 +2701,21 @@ async def sync_user_configs_from_wiki(
         page_name = name_elem.get_text().strip()
 
         try:
-            # Get created_by_linked and verify it matches the name
-            created_by_elem = page_elem.select_one(
-                "span.query_created_by_linked span.printuser"
+            # Validate page creator
+            creator = await _validate_page_creator(
+                page_elem, page_name, config_wiki_url, user_config_category
             )
-            if created_by_elem is None:
-                # Check if user was deleted
-                created_by_container = page_elem.select_one(
-                    "span.query_created_by_linked"
-                )
-                if created_by_container is not None:
-                    container_text = created_by_container.get_text().strip()
-                    if container_text == "(user deleted)":
-                        logger.info(
-                            "Page %s created by deleted user, deleting page",
-                            page_name,
-                        )
-                        await get_client().delete_page(
-                            config_wiki_url, f"{user_config_category}:{page_name}"
-                        )
-                        continue
-
-                logger.warning(
-                    "Page %s missing created_by_linked element, skipping", page_name
-                )
+            if creator is None:
                 continue
 
-            try:
-                created_by_user = user_parse(created_by_elem)
-            except Exception as e:
-                logger.warning(
-                    "Page %s failed to parse created_by_linked: %s, skipping",
-                    page_name,
-                    e,
-                )
-                continue
-
-            # Verify that the creator matches the name (page_name is user ID)
-            # Convert page_name to int for comparison
-            try:
-                page_name_id = int(page_name)
-            except ValueError:
-                logger.warning(
-                    "Page name %s is not a valid user ID, skipping", page_name
-                )
-                continue
-
-            if created_by_user.id is None or created_by_user.id != page_name_id:
-                logger.warning(
-                    "Page %s created by user ID %s, does not match page name "
-                    "(user ID), attempting to delete page",
-                    page_name,
-                    created_by_user.id,
-                )
-                await get_client().delete_page(
-                    config_wiki_url, f"{user_config_category}:{page_name}"
-                )
-                continue
-
-            # Get username and userid from created_by_user
-            if created_by_user.name is None:
-                logger.warning(
-                    "Page %s created_by_user has no name, skipping", page_name
-                )
-                continue
-
-            username = created_by_user.name
-            userid = created_by_user.id
-
-            # Get content from page element (YAML content)
-            content_elem = page_elem.select_one("span.query_content")
-            if content_elem is None:
-                logger.warning("Page %s missing content element, skipping", page_name)
-                continue
-
-            raw_config = content_elem.get_text().strip()
-
-            # Parse YAML config using msgspec
-            try:
-                config_dict = msgspec.yaml.decode(raw_config)
-            except Exception as e:
-                raise NeedsSanitizationError(
-                    f"Invalid YAML format for page {page_name}"
-                ) from e
-
-            # Get apprise_urls from form_data field (default to empty list)
-            apprise_urls = extract_lines_from_page_element(page_elem, "apprise_urls")
-
-            # Get timezone (default to UTC)
-            timezone = config_dict.get("timezone", "UTC")
-            if not isinstance(timezone, str):
-                timezone = "UTC"
-
-            # Get mention_level (default to AVATARHOVER)
-            mention_level_str = config_dict.get("mention_level", "avatarhover")
-            if not isinstance(mention_level_str, str):
-                mention_level_str = "avatarhover"
-            try:
-                mention_level = MentionLevel(mention_level_str.lower())
-            except ValueError:
-                mention_level = MentionLevel.AVATARHOVER
-
-            # Get email from form_data field (optional)
-            # Empty string means explicitly empty, overriding contact_email
-            email_elem = page_elem.select_one("span.query_email")
-            email = email_elem.get_text().strip() if email_elem else ""
-
-            # Get notification enable flags
-            enable_wikidot_pm = config_dict.get("enable_wikidot_pm") == "1"
-            enable_email = config_dict.get("enable_email") == "1"
-            enable_apprise = config_dict.get("enable_apprise") == "1"
-
-            # Get subscriptions from form_data field (default to empty set)
-            subscription_lines = extract_lines_from_page_element(
-                page_elem, "subscriptions"
-            )
-            subscriptions = {
-                normalized
-                for line in subscription_lines
-                if (normalized := normalize_post_url(line)) is not None
-            }
-
-            # Get unsubscriptions from form_data field (default to empty set)
-            unsubscription_lines = extract_lines_from_page_element(
-                page_elem, "unsubscriptions"
-            )
-            unsubscriptions = {
-                normalized
-                for line in unsubscription_lines
-                if (normalized := normalize_post_url(line)) is not None
-            }
-
-            # Create UserInfo object
-            user_info = UserInfo(
-                userid=userid,
-                username=username,
-                apprise_urls=apprise_urls,
-                timezone=timezone,
-                mention_level=mention_level,
-                email=email,
-                enable_wikidot_pm=enable_wikidot_pm,
-                enable_email=enable_email,
-                enable_apprise=enable_apprise,
-                subscriptions=subscriptions,
-                unsubscriptions=unsubscriptions,
-            )
+            # Parse user config from page
+            user_info = _parse_user_config_from_page(page_elem, page_name, creator)
 
             user_infos.append(user_info)
             logger.debug(
                 "Parsed user config for %s (ID: %s) from %s",
-                username,
-                userid,
+                creator.name,
+                creator.id,
                 page_name,
             )
 

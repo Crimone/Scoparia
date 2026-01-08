@@ -7,8 +7,13 @@ import pytest
 
 from scoparia.api import (
     Contact,
+    ForumThread,
     Link,
+    NeedsSanitizationError,
     RSSForumPost,
+    User,
+    UserType,
+    _parse_user_config_from_page,
     get_client,
     init_client,
     normalize_post_url,
@@ -198,3 +203,176 @@ class TestClientGlobalFunctions:
         with patch("scoparia.api._client_instance", mock_instance):
             result = get_client()
             assert result == mock_instance
+
+
+class TestUserStruct:
+    """Test User struct default values."""
+
+    def test_user_default_values(self) -> None:
+        """Test that User struct uses correct default values."""
+        user = User(type=UserType.USER)
+        assert user.id == 0
+        assert user.name == ""
+        assert user.unix_name == ""
+        assert user.avatar_url == ""
+        assert user.ip == ""
+
+    def test_user_with_values(self) -> None:
+        """Test User struct with explicit values."""
+        user = User(
+            type=UserType.USER,
+            id=123,
+            name="TestUser",
+            unix_name="testuser",
+            avatar_url="https://example.com/avatar.png",
+        )
+        assert user.id == 123
+        assert user.name == "TestUser"
+        assert user.unix_name == "testuser"
+        assert user.avatar_url == "https://example.com/avatar.png"
+        assert user.ip == ""
+
+    def test_anonymous_user_with_ip(self) -> None:
+        """Test anonymous user with IP address."""
+        user = User(
+            type=UserType.ANONYMOUS,
+            name="Anonymous",
+            unix_name="anonymous",
+            ip="192.168.1.1",
+        )
+        assert user.type == UserType.ANONYMOUS
+        assert user.ip == "192.168.1.1"
+
+
+class TestForumThreadHelpers:
+    """Test ForumThread static helper methods."""
+
+    def test_parse_thread_category(self) -> None:
+        """Test _parse_thread_category with valid breadcrumbs."""
+        from bs4 import BeautifulSoup
+
+        html = """
+        <div class="forum-breadcrumbs">
+            <a href="/forum/c-12345/category-name">Test Category</a>
+            » Thread Title
+        </div>
+        """
+        soup = BeautifulSoup(html, "lxml")
+        bc_elem = soup.select_one("div.forum-breadcrumbs")
+        assert bc_elem is not None
+
+        category = ForumThread._parse_thread_category(bc_elem)
+        assert category.id == 12345
+        assert category.title == "Test Category"
+
+    def test_parse_thread_category_missing_link(self) -> None:
+        """Test _parse_thread_category raises exception when category link missing."""
+        from bs4 import BeautifulSoup
+
+        from scoparia.api import NoElementException
+
+        html = """<div class="forum-breadcrumbs">No category link here</div>"""
+        soup = BeautifulSoup(html, "lxml")
+        bc_elem = soup.select_one("div.forum-breadcrumbs")
+        assert bc_elem is not None
+
+        with pytest.raises(NoElementException):
+            ForumThread._parse_thread_category(bc_elem)
+
+    def test_parse_thread_page_fullname(self) -> None:
+        """Test _parse_thread_page_fullname with valid description block."""
+        from bs4 import BeautifulSoup
+
+        html = """
+        <html>
+        <div class="description-block">
+            <a href="/scp-001">SCP-001</a>
+            <a href="/forum/t-123">Forum Thread</a>
+        </div>
+        </html>
+        """
+        soup = BeautifulSoup(html, "lxml")
+
+        result = ForumThread._parse_thread_page_fullname(soup)
+        assert result == "scp-001"
+
+    def test_parse_thread_page_fullname_no_description(self) -> None:
+        """Test _parse_thread_page_fullname returns None when no description block."""
+        from bs4 import BeautifulSoup
+
+        html = """<html><div>No description block</div></html>"""
+        soup = BeautifulSoup(html, "lxml")
+
+        result = ForumThread._parse_thread_page_fullname(soup)
+        assert result is None
+
+
+class TestParseUserConfigFromPage:
+    """Test _parse_user_config_from_page function."""
+
+    def test_parse_user_config_missing_content(self) -> None:
+        """Test that missing content element raises ValueError."""
+        from bs4 import BeautifulSoup
+
+        html = """<div class="page"><span class="query_name">test</span></div>"""
+        soup = BeautifulSoup(html, "lxml")
+        page_elem = soup.select_one("div.page")
+        assert page_elem is not None
+
+        creator = User(type=UserType.USER, id=123, name="TestUser")
+
+        with pytest.raises(ValueError, match="missing content element"):
+            _parse_user_config_from_page(page_elem, "test", creator)
+
+    def test_parse_user_config_invalid_yaml(self) -> None:
+        """Test that invalid YAML raises NeedsSanitizationError."""
+        from bs4 import BeautifulSoup
+
+        html = """
+        <div class="page">
+            <span class="query_content">invalid: yaml: content: :</span>
+        </div>
+        """
+        soup = BeautifulSoup(html, "lxml")
+        page_elem = soup.select_one("div.page")
+        assert page_elem is not None
+
+        creator = User(type=UserType.USER, id=123, name="TestUser")
+
+        with pytest.raises(NeedsSanitizationError, match="Invalid YAML format"):
+            _parse_user_config_from_page(page_elem, "test", creator)
+
+    def test_parse_user_config_valid(self) -> None:
+        """Test parsing valid user config from page element."""
+        from bs4 import BeautifulSoup
+
+        html = """
+        <div class="page">
+            <span class="query_content">
+timezone: Asia/Shanghai
+mention_level: all
+enable_wikidot_pm: "1"
+enable_email: "1"
+enable_apprise: "0"
+            </span>
+            <span class="query_email">test@example.com</span>
+            <span class="query_apprise_urls">json://localhost</span>
+            <span class="query_subscriptions">scp-wiki.wikidot.com/forum/t-123</span>
+            <span class="query_unsubscriptions">scp-wiki.wikidot.com/forum/t-456</span>
+        </div>
+        """
+        soup = BeautifulSoup(html, "lxml")
+        page_elem = soup.select_one("div.page")
+        assert page_elem is not None
+
+        creator = User(type=UserType.USER, id=123, name="TestUser")
+
+        user_info = _parse_user_config_from_page(page_elem, "123", creator)
+
+        assert user_info.userid == 123
+        assert user_info.username == "TestUser"
+        assert user_info.timezone == "Asia/Shanghai"
+        assert user_info.email == "test@example.com"
+        assert user_info.enable_wikidot_pm is True
+        assert user_info.enable_email is True
+        assert user_info.enable_apprise is False

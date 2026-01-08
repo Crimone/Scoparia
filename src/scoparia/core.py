@@ -383,7 +383,7 @@ class ScopariaCore:
 
             # Remove the post author from notification list
             # Users should not receive notifications for their own posts
-            if target_post.created_by.id is not None:
+            if target_post.created_by.id:
                 users_to_notify.discard(target_post.created_by.id)
 
             # Add post to notification list for each user
@@ -664,64 +664,52 @@ class ScopariaCore:
                 user_info.username,
             )
 
-    async def process_rss_feed(self) -> None:
-        """Process RSS feed and send notifications.
+    async def _load_users(self) -> dict[int, UserInfo] | None:
+        """Load users from database or environment variable.
 
-        This is the main entry point for cron execution.
+        Returns:
+            Dictionary mapping userid to UserInfo, or None if no users found.
         """
-        logger.info("Starting RSS feed processing")
-
         cfg = get_config()
 
-        # Get users based on database mode
         if cfg.mongodb_uri is None:
             # No-database mode: use users from environment variable
             if not cfg.users:
                 logger.error("No users configured in USERS_JSON for no-database mode")
-                return
-            users = cfg.users
-            logger.info("Using %s users from USERS_JSON (no-database mode)", len(users))
-        else:
-            # MongoDB mode: get users from database
-            users = await get_mongodb().get_all_users()
-            if not users:
-                logger.warning("No users found in database")
-                return
-            logger.info("Monitoring %s users from database", len(users))
+                return None
+            logger.info(
+                "Using %s users from USERS_JSON (no-database mode)", len(cfg.users)
+            )
+            return cfg.users
 
-        # Get RSS site URLs from configuration
-        rss_site_urls = cfg.rss_site_urls
+        # MongoDB mode: get users from database
+        users = await get_mongodb().get_all_users()
+        if not users:
+            logger.warning("No users found in database")
+            return None
+        logger.info("Monitoring %s users from database", len(users))
+        return users
 
-        # Fetch RSS posts from all sites with per-site timestamps
+    async def _fetch_rss_posts_from_sites(
+        self, rss_site_urls: list[str], last_rss_check_dict: dict[str, datetime]
+    ) -> tuple[list[RSSForumPost], dict[str, datetime]]:
+        """Fetch RSS posts from all configured sites.
+
+        Args:
+            rss_site_urls: List of site URLs to fetch from.
+            last_rss_check_dict: Dictionary of last check times per site.
+
+        Returns:
+            Tuple of (new_posts, site_timestamps).
+        """
         new_posts: list[RSSForumPost] = []
         site_timestamps: dict[str, datetime] = {}
-        is_first_run = False
-
-        # Get last check timestamps (per-site dictionary)
-        # Always use GitHub Variables for last_rss_check
-        last_rss_check_dict: dict[str, datetime]
-        last_check_json = os.getenv("LAST_RSS_CHECK")
-        if not last_check_json:
-            logger.info("LAST_RSS_CHECK not set, treating as first run")
-            last_rss_check_dict = {}
-        else:
-            try:
-                # Parse JSON directly to dict[str, datetime] using msgspec
-                last_rss_check_dict = msgspec.json.decode(
-                    last_check_json, type=dict[str, datetime]
-                )
-            except msgspec.DecodeError:
-                logger.warning("Failed to parse LAST_RSS_CHECK. Treating as first run")
-                last_rss_check_dict = {}
 
         for site_url in rss_site_urls:
-            # Get last check timestamp for this specific site
             last_check = last_rss_check_dict.get(site_url)
 
             if last_check is None:
-                is_first_run = True
                 logger.info("First run for %s, will record timestamp", site_url)
-                # Use current time as placeholder for first run
                 site_timestamps[site_url] = datetime.now(UTC)
                 continue
 
@@ -737,45 +725,81 @@ class ScopariaCore:
                 )
                 new_posts.extend(site_posts)
                 logger.info("Fetched %s posts from %s", len(site_posts), site_url)
-
                 site_timestamps[site_url] = build_date
             except Exception as e:
                 logger.error(
                     "Failed to fetch RSS from %s: %s", site_url, e, exc_info=True
                 )
-                # Don't update LAST_RSS_CHECK for failed sites
                 continue
 
-        # Update timestamps after successful fetch
-        # Only update timestamps for successfully fetched sites
-        # Failed sites will keep their previous timestamps
-        if site_timestamps:
-            # Merge successful site timestamps with existing ones
-            # This preserves timestamps for sites that failed to fetch
-            updated_timestamps = last_rss_check_dict.copy()
-            # Ensure all timestamps are in UTC before storing
-            for site_url, timestamp in site_timestamps.items():
-                if timestamp.tzinfo is None:
-                    updated_timestamps[site_url] = timestamp.replace(tzinfo=UTC)
-                else:
-                    updated_timestamps[site_url] = timestamp
-            # Convert datetime objects to strings for GitHub variable
-            updated_timestamps_str = msgspec.json.encode(updated_timestamps).decode(
-                "utf-8"
-            )
-            await set_github_variable("LAST_RSS_CHECK", updated_timestamps_str)
+        return new_posts, site_timestamps
 
-        # Handle first run
-        if is_first_run and not new_posts:
-            logger.info("First run detected for some sites, skipping processing")
+    async def _save_timestamps(
+        self,
+        site_timestamps: dict[str, datetime],
+        last_rss_check_dict: dict[str, datetime],
+    ) -> None:
+        """Save updated timestamps to GitHub variable.
+
+        Args:
+            site_timestamps: New timestamps from successful fetches.
+            last_rss_check_dict: Existing timestamps dictionary.
+        """
+        if not site_timestamps:
             return
 
-        if not new_posts:
-            logger.info("No new posts found since last check")
+        # Merge successful site timestamps with existing ones
+        updated_timestamps = last_rss_check_dict.copy()
+        for site_url, timestamp in site_timestamps.items():
+            if timestamp.tzinfo is None:
+                updated_timestamps[site_url] = timestamp.replace(tzinfo=UTC)
+            else:
+                updated_timestamps[site_url] = timestamp
+
+        updated_timestamps_str = msgspec.json.encode(updated_timestamps).decode("utf-8")
+        await set_github_variable("LAST_RSS_CHECK", updated_timestamps_str)
+
+    async def process_rss_feed(self) -> None:
+        """Process RSS feed and send notifications.
+
+        This is the main entry point for cron execution.
+        """
+        logger.info("Starting RSS feed processing")
+
+        # Load users
+        users = await self._load_users()
+        if users is None:
             return
+
+        # Get RSS site URLs from configuration
+        cfg = get_config()
+        rss_site_urls = cfg.rss_site_urls
+
+        # Get last check timestamps
+        last_rss_check_dict: dict[str, datetime]
+        last_check_json = os.getenv("LAST_RSS_CHECK")
+        if not last_check_json:
+            logger.info("LAST_RSS_CHECK not set, treating as first run")
+            last_rss_check_dict = {}
+        else:
+            try:
+                last_rss_check_dict = msgspec.json.decode(
+                    last_check_json, type=dict[str, datetime]
+                )
+            except msgspec.DecodeError:
+                logger.warning("Failed to parse LAST_RSS_CHECK. Treating as first run")
+                last_rss_check_dict = {}
+
+        # Fetch RSS posts from all sites
+        new_posts, site_timestamps = await self._fetch_rss_posts_from_sites(
+            rss_site_urls, last_rss_check_dict
+        )
+
+        # Save timestamps
+        await self._save_timestamps(site_timestamps, last_rss_check_dict)
 
         logger.info(
-            f"Processing {len(new_posts)} new posts from {len(rss_site_urls)} sites"
+            "Processing %s new posts from %s sites", len(new_posts), len(rss_site_urls)
         )
 
         # Reset notification state for this processing run
@@ -784,14 +808,11 @@ class ScopariaCore:
         # Process each new post
         for post in new_posts:
             logger.debug("Processing post %s by %s", post.post_id, post.author_name)
-
-            # Check if any users should be notified for this post
             await self.check_post_for_users(post, users)
 
         # Send notifications (one per user)
         for userid, posts_list in self.all_user_notifications.items():
             user_info = users[userid]
-            # Send all notifications via enabled channels
             await self.send_all_notifications(user_info, posts_list)
 
         logger.info("RSS feed processing complete. Processed %s posts", len(new_posts))

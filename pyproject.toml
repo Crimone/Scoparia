@@ -58,20 +58,7 @@ dev = [
 target-version = "py311"
 
 [tool.ruff.lint]
-select = [
-    # pycodestyle
-    "E",
-    # Pyflakes
-    "F",
-    # pyupgrade
-    "UP",
-    # flake8-bugbear
-    "B",
-    # flake8-simplify
-    "SIM",
-    # isort
-    "I",
-]
+select = ["E", "F", "UP", "B", "SIM", "I", "C90"]
 
 [tool.pyright]
 include = ["src"]

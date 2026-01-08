@@ -506,3 +506,174 @@ class TestScopariaCore:
 
         core.all_user_notifications.clear()
         assert len(core.all_user_notifications) == 0
+
+    @pytest.mark.asyncio
+    async def test_load_users_from_env(self, core: ScopariaCore) -> None:
+        """Test _load_users returns users from environment variable."""
+        cfg_users = {
+            123: UserInfo(
+                userid=123,
+                username="EnvUser",
+                apprise_urls=[],
+                mention_level=MentionLevel.AVATARHOVER,
+            )
+        }
+        mock_config = MagicMock()
+        mock_config.mongodb_uri = None
+        mock_config.users = cfg_users
+
+        with patch("scoparia.core.get_config", return_value=mock_config):
+            result = await core._load_users()
+            assert result is not None
+            assert 123 in result
+            assert result[123].username == "EnvUser"
+
+    @pytest.mark.asyncio
+    async def test_load_users_no_users_in_env(self, core: ScopariaCore) -> None:
+        """Test _load_users returns None when no users in environment."""
+        mock_config = MagicMock()
+        mock_config.mongodb_uri = None
+        mock_config.users = {}
+
+        with patch("scoparia.core.get_config", return_value=mock_config):
+            result = await core._load_users()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_load_users_from_mongodb(self, core: ScopariaCore) -> None:
+        """Test _load_users returns users from MongoDB."""
+        db_users = {
+            456: UserInfo(
+                userid=456,
+                username="DbUser",
+                apprise_urls=[],
+                mention_level=MentionLevel.ALL,
+            )
+        }
+        mock_config = MagicMock()
+        mock_config.mongodb_uri = "mongodb://localhost"
+
+        mock_db = AsyncMock()
+        mock_db.get_all_users.return_value = db_users
+
+        with (
+            patch("scoparia.core.get_config", return_value=mock_config),
+            patch("scoparia.core.get_mongodb", return_value=mock_db),
+        ):
+            result = await core._load_users()
+            assert result is not None
+            assert 456 in result
+            assert result[456].username == "DbUser"
+
+    @pytest.mark.asyncio
+    async def test_load_users_empty_mongodb(self, core: ScopariaCore) -> None:
+        """Test _load_users returns None when MongoDB has no users."""
+        mock_config = MagicMock()
+        mock_config.mongodb_uri = "mongodb://localhost"
+
+        mock_db = AsyncMock()
+        mock_db.get_all_users.return_value = {}
+
+        with (
+            patch("scoparia.core.get_config", return_value=mock_config),
+            patch("scoparia.core.get_mongodb", return_value=mock_db),
+        ):
+            result = await core._load_users()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_fetch_rss_posts_from_sites_first_run(
+        self, core: ScopariaCore
+    ) -> None:
+        """Test _fetch_rss_posts_from_sites on first run (no last check)."""
+        rss_site_urls = ["https://test-site.wikidot.com"]
+        last_rss_check_dict: dict[str, datetime] = {}
+
+        new_posts, site_timestamps = await core._fetch_rss_posts_from_sites(
+            rss_site_urls, last_rss_check_dict
+        )
+
+        # First run should not fetch posts, just record timestamp
+        assert new_posts == []
+        assert "https://test-site.wikidot.com" in site_timestamps
+
+    @pytest.mark.asyncio
+    async def test_fetch_rss_posts_from_sites_with_posts(
+        self, core: ScopariaCore
+    ) -> None:
+        """Test _fetch_rss_posts_from_sites fetches posts when last check exists."""
+        rss_site_urls = ["https://test-site.wikidot.com"]
+        last_check = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
+        last_rss_check_dict = {"https://test-site.wikidot.com": last_check}
+
+        mock_post = RSSForumPost(
+            post_id=123,
+            thread_id=456,
+            title="Test Post",
+            link="https://test-site.wikidot.com/forum/t-456#post-123",
+            author_name="TestUser",
+            content="<p>Test content</p>",
+            publish_time=datetime.now(UTC),
+            site_url="https://test-site.wikidot.com",
+            parents=[],
+        )
+        build_date = datetime.now(UTC)
+
+        mock_client = AsyncMock()
+        mock_client.fetch_rss_posts.return_value = ([mock_post], build_date)
+
+        with patch("scoparia.core.get_client", return_value=mock_client):
+            new_posts, site_timestamps = await core._fetch_rss_posts_from_sites(
+                rss_site_urls, last_rss_check_dict
+            )
+
+            assert len(new_posts) == 1
+            assert new_posts[0].post_id == 123
+            assert "https://test-site.wikidot.com" in site_timestamps
+
+    @pytest.mark.asyncio
+    async def test_save_timestamps_updates_github(self, core: ScopariaCore) -> None:
+        """Test _save_timestamps updates GitHub variable."""
+        site_timestamps = {
+            "https://test-site.wikidot.com": datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
+        }
+        last_rss_check_dict: dict[str, datetime] = {}
+
+        with patch("scoparia.core.set_github_variable") as mock_set_var:
+            mock_set_var.return_value = None
+            await core._save_timestamps(site_timestamps, last_rss_check_dict)
+
+            mock_set_var.assert_called_once()
+            call_args = mock_set_var.call_args
+            assert call_args[0][0] == "LAST_RSS_CHECK"
+
+    @pytest.mark.asyncio
+    async def test_save_timestamps_empty_timestamps(self, core: ScopariaCore) -> None:
+        """Test _save_timestamps does nothing when timestamps are empty."""
+        site_timestamps: dict[str, datetime] = {}
+        last_rss_check_dict: dict[str, datetime] = {}
+
+        with patch("scoparia.core.set_github_variable") as mock_set_var:
+            await core._save_timestamps(site_timestamps, last_rss_check_dict)
+
+            mock_set_var.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_save_timestamps_merges_existing(self, core: ScopariaCore) -> None:
+        """Test _save_timestamps merges new timestamps with existing ones."""
+        existing_time = datetime(2024, 1, 10, 12, 0, 0, tzinfo=UTC)
+        new_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
+
+        site_timestamps = {"https://new-site.wikidot.com": new_time}
+        last_rss_check_dict = {"https://existing-site.wikidot.com": existing_time}
+
+        with patch("scoparia.core.set_github_variable") as mock_set_var:
+            mock_set_var.return_value = None
+            await core._save_timestamps(site_timestamps, last_rss_check_dict)
+
+            mock_set_var.assert_called_once()
+            call_args = mock_set_var.call_args
+            json_value = call_args[0][1]
+            # Verify both timestamps are in the JSON
+            assert "existing-site" in json_value
+            assert "new-site" in json_value
