@@ -155,7 +155,6 @@ class TestNormalizePostUrl:
 class TestClientGlobalFunctions:
     """Test global client functions."""
 
-    @pytest.mark.asyncio
     async def test_init_client(self) -> None:
         """Test initializing client."""
         with (
@@ -173,7 +172,6 @@ class TestClientGlobalFunctions:
             mock_client_class.assert_called_once()
             mock_auth.login.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_init_client_already_initialized(self) -> None:
         """Test that initializing client twice raises RuntimeError."""
         with (

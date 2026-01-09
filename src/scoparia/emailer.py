@@ -1,10 +1,10 @@
 """Email sending functionality."""
 
-import asyncio
 import base64
 import os
 import re
 
+import anyio.to_thread
 import msgspec
 from O365 import Account, EnvTokenBackend, MSGraphProtocol
 
@@ -226,7 +226,7 @@ async def send_email(title: str, body: str, to_email: str) -> bool:
         ... )
         True
     """
-    return await asyncio.to_thread(_send_email_sync, title, body, to_email)
+    return await anyio.to_thread.run_sync(_send_email_sync, title, body, to_email)
 
 
 async def flush_token_to_github() -> None:

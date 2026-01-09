@@ -11,7 +11,6 @@ from scoparia.crom import get_page_author_id_from_crom
 class TestGetPageAuthorIdFromCrom:
     """Test get_page_author_id_from_crom function."""
 
-    @pytest.mark.asyncio
     async def test_get_page_author_id_success(self) -> None:
         """Test successfully getting page author ID from CROM API."""
         # Mock response data
@@ -47,7 +46,6 @@ class TestGetPageAuthorIdFromCrom:
 
             assert result == 1234567
 
-    @pytest.mark.asyncio
     async def test_get_page_author_id_deleted_account(self) -> None:
         """Test getting page author ID when account is deleted."""
         # Mock response with null createdBy
@@ -79,7 +77,6 @@ class TestGetPageAuthorIdFromCrom:
 
             assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_page_author_id_http_client_error(self) -> None:
         """Test handling HTTP client errors."""
         # Mock the session to raise ClientError
@@ -104,7 +101,6 @@ class TestGetPageAuthorIdFromCrom:
                     "https://scp-wiki.wikidot.com", "scp-173"
                 )
 
-    @pytest.mark.asyncio
     async def test_get_page_author_id_key_error(self) -> None:
         """Test handling KeyError when response structure is invalid."""
         # Mock response with missing data
@@ -133,7 +129,6 @@ class TestGetPageAuthorIdFromCrom:
                     "https://scp-wiki.wikidot.com", "scp-173"
                 )
 
-    @pytest.mark.asyncio
     async def test_get_page_author_id_https_to_http(self) -> None:
         """Test that HTTPS URLs are converted to HTTP for CROM API."""
         # Mock response

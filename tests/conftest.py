@@ -12,6 +12,12 @@ from scoparia.config import MentionLevel, UserInfo
 
 
 @pytest.fixture
+def anyio_backend() -> str:
+    """Fixture to specify the backend for AnyIO tests."""
+    return "asyncio"
+
+
+@pytest.fixture
 def mock_env_vars() -> Generator[dict[str, str], None, None]:
     """Fixture to mock environment variables for testing."""
     env_vars = {

@@ -28,7 +28,6 @@ class TestMongoDBClient:
             client.db = mock_mongo_client["db_scoparia"]
             return client
 
-    @pytest.mark.asyncio
     async def test_get_all_users(self, mongodb_client: MongoDBClient) -> None:
         """Test getting all users from database."""
         # Mock user documents
@@ -89,7 +88,6 @@ class TestMongoDBClient:
         assert users[456].mention_level == MentionLevel.ALL
         assert users[456].contact_email is None
 
-    @pytest.mark.asyncio
     async def test_get_all_users_defaults(self, mongodb_client: MongoDBClient) -> None:
         """Test getting users with default values."""
         mock_users = [
@@ -130,7 +128,6 @@ class TestMongoDBClient:
         assert users[123].enable_email is True
         assert users[123].enable_apprise is True
 
-    @pytest.mark.asyncio
     async def test_get_user(self, mongodb_client: MongoDBClient) -> None:
         """Test getting a specific user."""
         mock_user = {
@@ -148,7 +145,6 @@ class TestMongoDBClient:
         assert user.userid == 123
         assert user.username == "TestUser"
 
-    @pytest.mark.asyncio
     async def test_get_user_not_found(self, mongodb_client: MongoDBClient) -> None:
         """Test getting a user that doesn't exist."""
         mongodb_client.db["t_users"].find_one = AsyncMock(return_value=None)
@@ -157,7 +153,6 @@ class TestMongoDBClient:
 
         assert user is None
 
-    @pytest.mark.asyncio
     async def test_remove_user(self, mongodb_client: MongoDBClient) -> None:
         """Test removing a user."""
         mongodb_client.db["t_users"].delete_one = AsyncMock()
@@ -166,7 +161,6 @@ class TestMongoDBClient:
 
         mongodb_client.db["t_users"].delete_one.assert_called_once_with({"userid": 123})
 
-    @pytest.mark.asyncio
     async def test_upsert_contacts(self, mongodb_client: MongoDBClient) -> None:
         """Test upserting contacts."""
         contacts = [
@@ -183,7 +177,6 @@ class TestMongoDBClient:
         operations = call_args[0][0]
         assert len(operations) == 2
 
-    @pytest.mark.asyncio
     async def test_upsert_contacts_empty(self, mongodb_client: MongoDBClient) -> None:
         """Test upserting empty contacts list."""
         mongodb_client.db["t_users"].bulk_write = AsyncMock()
@@ -192,7 +185,6 @@ class TestMongoDBClient:
 
         mongodb_client.db["t_users"].bulk_write.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_upsert_users(self, mongodb_client: MongoDBClient) -> None:
         """Test upserting users."""
         users = [
@@ -222,7 +214,6 @@ class TestMongoDBClient:
         operations = call_args[0][0]
         assert len(operations) == 1
 
-    @pytest.mark.asyncio
     async def test_upsert_users_empty(self, mongodb_client: MongoDBClient) -> None:
         """Test upserting empty users list."""
         mongodb_client.db["t_users"].bulk_write = AsyncMock()
@@ -231,7 +222,6 @@ class TestMongoDBClient:
 
         mongodb_client.db["t_users"].bulk_write.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_close(self, mongodb_client: MongoDBClient) -> None:
         """Test closing MongoDB connection."""
         mongodb_client.client.close = AsyncMock()
@@ -240,7 +230,6 @@ class TestMongoDBClient:
 
         mongodb_client.client.close.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_ensure_schema_validation_new_collections(
         self, mongodb_client: MongoDBClient
     ) -> None:
@@ -257,7 +246,6 @@ class TestMongoDBClient:
         # Should create users collection
         mongodb_client.db.create_collection.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_ensure_schema_validation_existing_collections(
         self, mongodb_client: MongoDBClient
     ) -> None:
@@ -276,7 +264,6 @@ class TestMongoDBClient:
 class TestMongoDBGlobalFunctions:
     """Test global MongoDB functions."""
 
-    @pytest.mark.asyncio
     async def test_init_mongodb_with_uri(self) -> None:
         """Test initializing MongoDB with URI."""
         with (
@@ -297,7 +284,6 @@ class TestMongoDBGlobalFunctions:
             mock_client_class.assert_called_once_with("mongodb://localhost:27017")
             mock_client_instance.ensure_schema_validation.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_init_mongodb_no_database_mode(self) -> None:
         """Test initializing MongoDB in no-database mode."""
         with (
@@ -313,7 +299,6 @@ class TestMongoDBGlobalFunctions:
 
             mock_client_class.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_init_mongodb_already_initialized(self) -> None:
         """Test that initializing MongoDB twice raises RuntimeError."""
         with (

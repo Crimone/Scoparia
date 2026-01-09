@@ -1,7 +1,5 @@
 """Tests for Scoparia GitHub storage module."""
 
-import pytest
-
 from scoparia.emailer import GitHubActionTokenBackend
 from scoparia.github_storage import set_github_variable
 
@@ -9,7 +7,6 @@ from scoparia.github_storage import set_github_variable
 class TestSetGitHubVariable:
     """Test set_github_variable function."""
 
-    @pytest.mark.asyncio
     async def test_set_github_variable_no_repo(self) -> None:
         """Test that missing REPO doesn't raise an error, just logs warning."""
         # Should not raise an error, just log a warning

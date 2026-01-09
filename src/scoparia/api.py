@@ -1,4 +1,3 @@
-import asyncio
 import contextlib
 import re
 import time
@@ -9,6 +8,7 @@ from typing import Any
 from urllib.parse import ParseResult, urlparse
 
 import aiohttp
+import anyio
 import feedparser
 import msgspec
 import yaml
@@ -2233,7 +2233,7 @@ class Client:
 # ==============================================================================
 
 _client_instance: Client | None = None
-_client_lock = asyncio.Lock()
+_client_lock = anyio.Lock()
 
 
 async def init_client(

@@ -1,8 +1,8 @@
 """MongoDB database layer for Scoparia."""
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
+import anyio
 from pymongo import AsyncMongoClient, UpdateOne
 
 from . import logger
@@ -333,7 +333,7 @@ class MongoDBClient:
 
 # Global MongoDB instance
 _mongodb_instance: MongoDBClient | None = None
-_mongodb_lock = asyncio.Lock()
+_mongodb_lock = anyio.Lock()
 
 
 async def init_mongodb() -> None:

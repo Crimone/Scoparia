@@ -3,6 +3,8 @@
 import argparse
 import sys
 
+import anyio
+
 from . import api, config, core, logger, mongodb
 
 
@@ -90,14 +92,7 @@ async def _async_main() -> None:
 def main() -> None:
     """Main entry point."""
     try:
-        if sys.platform == "win32":
-            import winloop  # type: ignore[import]
-
-            winloop.run(_async_main())
-        else:
-            import uvloop  # type: ignore[import]
-
-            uvloop.run(_async_main())
+        anyio.run(_async_main, backend_options={"use_uvloop": True})
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
         sys.exit(0)

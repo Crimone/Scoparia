@@ -49,19 +49,16 @@ class TestScopariaCore:
             ),
         }
 
-    @pytest.mark.asyncio
     async def test_initialize(self, core: ScopariaCore) -> None:
         """Test core initialization."""
         await core.initialize()
         # Should not raise any exceptions
 
-    @pytest.mark.asyncio
     async def test_cleanup(self, core: ScopariaCore) -> None:
         """Test core cleanup."""
         await core.cleanup()
         # Should not raise any exceptions
 
-    @pytest.mark.asyncio
     async def test_check_mentions_avatarhover(self, core: ScopariaCore) -> None:
         """Test checking mentions with avatarhover level."""
         users = {
@@ -86,7 +83,6 @@ class TestScopariaCore:
         core._check_mentions(post, users, users_to_notify)
         assert 123 in users_to_notify
 
-    @pytest.mark.asyncio
     async def test_check_mentions_all_level(self, core: ScopariaCore) -> None:
         """Test checking mentions with ALL level."""
         users = {
@@ -111,7 +107,6 @@ class TestScopariaCore:
         core._check_mentions(post, users, users_to_notify)
         assert 123 in users_to_notify
 
-    @pytest.mark.asyncio
     async def test_check_mentions_disabled(self, core: ScopariaCore) -> None:
         """Test that disabled mention level doesn't trigger notification."""
         users = {
@@ -135,7 +130,6 @@ class TestScopariaCore:
         core._check_mentions(post, users, users_to_notify)
         assert 123 not in users_to_notify
 
-    @pytest.mark.asyncio
     async def test_check_mentions_avatarhover_requires_class(
         self, core: ScopariaCore
     ) -> None:
@@ -162,7 +156,6 @@ class TestScopariaCore:
         core._check_mentions(post, users, users_to_notify)
         assert 123 not in users_to_notify
 
-    @pytest.mark.asyncio
     async def test_check_reply_to_user_post(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -183,7 +176,6 @@ class TestScopariaCore:
         await core._check_reply(post, thread, sample_users, users_to_notify)
         assert 123 in users_to_notify
 
-    @pytest.mark.asyncio
     async def test_check_reply_to_thread_creator(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -202,7 +194,6 @@ class TestScopariaCore:
         await core._check_reply(post, thread, sample_users, users_to_notify)
         assert 123 in users_to_notify
 
-    @pytest.mark.asyncio
     async def test_send_email_notification(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -230,7 +221,6 @@ class TestScopariaCore:
             assert call_args.kwargs["to_email"] == "test@example.com"
             assert call_args.kwargs["title"] == "[Scoparia] New post from TestUser"
 
-    @pytest.mark.asyncio
     async def test_send_email_notification_no_email(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -254,7 +244,6 @@ class TestScopariaCore:
             await core._send_email_notification(user_info, posts)
             mock_send_email.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_send_email_notification_uses_contact_email(
         self, core: ScopariaCore
     ) -> None:
@@ -292,7 +281,6 @@ class TestScopariaCore:
             call_args = mock_send_email.call_args
             assert call_args.kwargs["to_email"] == "contact@example.com"
 
-    @pytest.mark.asyncio
     async def test_send_email_notification_error_notifies_admin(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -355,7 +343,6 @@ class TestScopariaCore:
             assert call_args.kwargs["to_user_id"] == 999
             assert "Email sending failed" in call_args.kwargs["body"]
 
-    @pytest.mark.asyncio
     async def test_send_wikidot_pm_notification(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -386,7 +373,6 @@ class TestScopariaCore:
             assert call_args.kwargs["to_user_id"] == 123
             assert call_args.kwargs["subject"] == "[Scoparia] New post from TestUser"
 
-    @pytest.mark.asyncio
     async def test_send_all_notifications(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -439,7 +425,6 @@ class TestScopariaCore:
             mock_send_email.assert_called_once()
             mock_send_apprise.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_send_all_notifications_disabled_channels(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:
@@ -507,7 +492,6 @@ class TestScopariaCore:
         core.all_user_notifications.clear()
         assert len(core.all_user_notifications) == 0
 
-    @pytest.mark.asyncio
     async def test_load_users_from_env(self, core: ScopariaCore) -> None:
         """Test _load_users returns users from environment variable."""
         cfg_users = {
@@ -528,7 +512,6 @@ class TestScopariaCore:
             assert 123 in result
             assert result[123].username == "EnvUser"
 
-    @pytest.mark.asyncio
     async def test_load_users_no_users_in_env(self, core: ScopariaCore) -> None:
         """Test _load_users returns None when no users in environment."""
         mock_config = MagicMock()
@@ -539,7 +522,6 @@ class TestScopariaCore:
             result = await core._load_users()
             assert result is None
 
-    @pytest.mark.asyncio
     async def test_load_users_from_mongodb(self, core: ScopariaCore) -> None:
         """Test _load_users returns users from MongoDB."""
         db_users = {
@@ -565,7 +547,6 @@ class TestScopariaCore:
             assert 456 in result
             assert result[456].username == "DbUser"
 
-    @pytest.mark.asyncio
     async def test_load_users_empty_mongodb(self, core: ScopariaCore) -> None:
         """Test _load_users returns None when MongoDB has no users."""
         mock_config = MagicMock()
@@ -581,7 +562,6 @@ class TestScopariaCore:
             result = await core._load_users()
             assert result is None
 
-    @pytest.mark.asyncio
     async def test_fetch_rss_posts_from_sites_first_run(
         self, core: ScopariaCore
     ) -> None:
@@ -597,7 +577,6 @@ class TestScopariaCore:
         assert new_posts == []
         assert "https://test-site.wikidot.com" in site_timestamps
 
-    @pytest.mark.asyncio
     async def test_fetch_rss_posts_from_sites_with_posts(
         self, core: ScopariaCore
     ) -> None:
@@ -631,7 +610,6 @@ class TestScopariaCore:
             assert new_posts[0].post_id == 123
             assert "https://test-site.wikidot.com" in site_timestamps
 
-    @pytest.mark.asyncio
     async def test_save_timestamps_updates_github(self, core: ScopariaCore) -> None:
         """Test _save_timestamps updates GitHub variable."""
         site_timestamps = {
@@ -647,7 +625,6 @@ class TestScopariaCore:
             call_args = mock_set_var.call_args
             assert call_args[0][0] == "LAST_RSS_CHECK"
 
-    @pytest.mark.asyncio
     async def test_save_timestamps_empty_timestamps(self, core: ScopariaCore) -> None:
         """Test _save_timestamps does nothing when timestamps are empty."""
         site_timestamps: dict[str, datetime] = {}
@@ -658,7 +635,6 @@ class TestScopariaCore:
 
             mock_set_var.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_save_timestamps_merges_existing(self, core: ScopariaCore) -> None:
         """Test _save_timestamps merges new timestamps with existing ones."""
         existing_time = datetime(2024, 1, 10, 12, 0, 0, tzinfo=UTC)

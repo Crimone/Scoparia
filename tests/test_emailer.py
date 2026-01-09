@@ -204,7 +204,6 @@ class TestSendEmail:
 class TestSendEmailAsync:
     """Test async send_email function."""
 
-    @pytest.mark.asyncio
     @patch("scoparia.emailer._send_email_sync")
     async def test_send_email_calls_sync_in_thread(self, mock_sync: MagicMock) -> None:
         """Test that send_email wraps _send_email_sync with to_thread."""
