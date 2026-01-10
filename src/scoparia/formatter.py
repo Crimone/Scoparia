@@ -13,7 +13,9 @@ from .api import (
     RSSForumPost,
 )
 
-LOGO_URL = "https://cdn.jsdelivr.net/gh/Crimone/Scoparia@main/src/scoparia/static/scoparia.webp"
+LOGO_URL = (
+    "https://cdn.jsdelivr.net/gh/Crimone/Scoparia@main/src/scoparia/static/scoparia.svg"
+)
 
 
 def _generate_identical_string(
