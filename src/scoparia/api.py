@@ -2,7 +2,7 @@ import contextlib
 import re
 import time
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from re import Match
 from typing import Any
 from urllib.parse import ParseResult, urlparse
@@ -672,7 +672,7 @@ class Link(msgspec.Struct):
 # ==============================================================================
 
 
-class UserType(str, Enum):
+class UserType(StrEnum):
     """Enumeration of user types."""
 
     USER = "user"  # Normal registered user
@@ -1451,7 +1451,7 @@ class ForumThread(msgspec.Struct):
 # ==============================================================================
 
 
-class ResponseType(str, Enum):
+class ResponseType(StrEnum):
     """Enumeration of HTTP response types."""
 
     BYTES = "bytes"

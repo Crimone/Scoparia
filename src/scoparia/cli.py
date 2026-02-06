@@ -21,8 +21,9 @@ def setup_argument_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--loglevel",
-        choices=["debug", "info", "warning", "error", "critical"],
-        default="info",
+        type=config.LogLevel,
+        choices=list(config.LogLevel),
+        default=config.LogLevel.INFO,
         help="Log level (default: info)",
     )
 

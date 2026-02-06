@@ -3,23 +3,27 @@
 import logging
 import sys
 
+from .config import LogLevel
 
-def setup_logger(name: str = "Scoparia", level: str = "INFO") -> logging.Logger:
+
+def setup_logger(
+    name: str = "Scoparia", level: LogLevel = LogLevel.INFO
+) -> logging.Logger:
     """Setup and configure logger.
 
     Args:
         name: Logger name. Defaults to "Scoparia".
-        level: Log level string. Defaults to "INFO".
+        level: Log level. Defaults to LogLevel.INFO.
 
     Returns:
         Configured logger instance.
     """
     logger = logging.getLogger(name)
-    logger.setLevel(getattr(logging, level.upper()))
+    logger.setLevel(level.upper())
 
     # Create console handler
     handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(getattr(logging, level.upper()))
+    handler.setLevel(level.upper())
 
     # Create formatter
     formatter = logging.Formatter(
@@ -48,15 +52,15 @@ def get_logger() -> logging.Logger:
     return _logger
 
 
-def set_level(level: str) -> None:
+def set_level(level: LogLevel) -> None:
     """Set log level for the default logger.
 
     Args:
-        level: Log level string (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+        level: Log level.
     """
-    _logger.setLevel(getattr(logging, level.upper()))
+    _logger.setLevel(level.upper())
     for handler in _logger.handlers:
-        handler.setLevel(getattr(logging, level.upper()))
+        handler.setLevel(level.upper())
 
 
 # Convenience functions

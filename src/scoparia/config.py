@@ -2,12 +2,12 @@
 
 import os
 import re
-from enum import Enum
+from enum import StrEnum
 
 import msgspec
 
 
-class LogLevel(Enum):
+class LogLevel(StrEnum):
     """Log level enumeration."""
 
     DEBUG = "debug"
@@ -46,7 +46,7 @@ def validate_and_normalize_wikidot_url(url: str) -> str:
     return normalized_url
 
 
-class MentionLevel(str, Enum):
+class MentionLevel(StrEnum):
     """Enumeration of mention notification levels.
 
     Attributes
