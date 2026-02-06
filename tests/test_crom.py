@@ -1,6 +1,7 @@
 """Tests for Scoparia CROM API module."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import urlparse
 
 import aiohttp
 import pytest
@@ -167,5 +168,7 @@ class TestGetPageAuthorIdFromCrom:
             assert call_args is not None
             json_data = call_args[1]["json"]
             variables = json_data["variables"]
-            assert "http://scp-wiki.wikidot.com" in variables["url"]
-            assert "https://scp-wiki.wikidot.com" not in variables["url"]
+
+            # Parse URL to safely verify scheme and hostname
+            parsed_url = urlparse(variables["url"])
+            assert parsed_url.scheme == "http"

@@ -513,14 +513,18 @@ def user_parse(elem: Tag) -> "User":
 
     # Treat as GuestUser if has Gravatar URL
     img_elem = elem.find("img")
-    if isinstance(img_elem, Tag) and "gravatar.com" in img_elem["src"]:
-        avatar_url = img_elem["src"]
-        guest_name = elem.get_text().strip().split(" ")[0]
-        return User(
-            type=UserType.GUEST,
-            name=guest_name,
-            avatar_url=str(avatar_url) if avatar_url else "",
-        )
+    if isinstance(img_elem, Tag):
+        hostname = urlparse(str(img_elem["src"])).hostname
+        if hostname and (
+            hostname == "gravatar.com" or hostname.endswith(".gravatar.com")
+        ):
+            avatar_url = img_elem["src"]
+            guest_name = elem.get_text().strip().split(" ")[0]
+            return User(
+                type=UserType.GUEST,
+                name=guest_name,
+                avatar_url=str(avatar_url) if avatar_url else "",
+            )
 
     if elem.get_text() == "Wikidot":
         return User(

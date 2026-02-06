@@ -575,7 +575,7 @@ class TestScopariaCore:
 
         # First run should not fetch posts, just record timestamp
         assert new_posts == []
-        assert "https://test-site.wikidot.com" in site_timestamps
+        assert site_timestamps.get("https://test-site.wikidot.com") is not None
 
     async def test_fetch_rss_posts_from_sites_with_posts(
         self, core: ScopariaCore
@@ -608,7 +608,7 @@ class TestScopariaCore:
 
             assert len(new_posts) == 1
             assert new_posts[0].post_id == 123
-            assert "https://test-site.wikidot.com" in site_timestamps
+            assert site_timestamps.get("https://test-site.wikidot.com") is not None
 
     async def test_save_timestamps_updates_github(self, core: ScopariaCore) -> None:
         """Test _save_timestamps updates GitHub variable."""

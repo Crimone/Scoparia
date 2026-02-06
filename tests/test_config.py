@@ -294,8 +294,8 @@ class TestLoadConfigFromEnv:
         with patch.dict(os.environ, env_vars):
             config = load_config_from_env()
             assert len(config.rss_site_urls) == 2
-            assert "https://scp-wiki.wikidot.com" in config.rss_site_urls
-            assert "https://scp-wiki-cn.wikidot.com" in config.rss_site_urls
+            assert config.rss_site_urls[0] == "https://scp-wiki.wikidot.com"
+            assert config.rss_site_urls[1] == "https://scp-wiki-cn.wikidot.com"
 
     def test_load_config_invalid_users_json(self) -> None:
         """Test that invalid USERS_JSON raises ValueError."""

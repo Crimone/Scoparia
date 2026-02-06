@@ -3,6 +3,9 @@ name: Notify
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: notify-workflow
   cancel-in-progress: false
