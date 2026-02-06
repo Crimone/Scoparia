@@ -1187,7 +1187,7 @@ wheels = [
 
 [[package]]
 name = "o365"
-version = "2.1.8"
+version = "2.1.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1197,9 +1197,9 @@ dependencies = [
     { name = "tzdata" },
     { name = "tzlocal" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/56/db77ef456e1240db67e8f763e8ca454b490974fe66339d43cb53ad43fcef/o365-2.1.8.tar.gz", hash = "sha256:3fcb371e82cffa7b4fee758e5f64fe97e18abc6c92a45c236688cbd15b4bdd45", size = 144253, upload-time = "2025-11-28T10:46:33.203Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/65/75/268dcc4bc1686d7512d983b010d49a85b0f696141d1143f459622111aa2f/o365-2.1.9.tar.gz", hash = "sha256:15811bbe80785b3bc0adaf8a212e351ea74de2b7b5ce5a094c3e937713d68c1d", size = 145217, upload-time = "2026-01-30T10:21:14.455Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/4a/8d81e878d7b81f396852355b5726cdcd0f8a5b4e5f8c6a1a67f94734be0e/o365-2.1.8-py3-none-any.whl", hash = "sha256:7527ed05bce04475eef35608e48733f569c908e93b6b49815c42f6d00b1adf61", size = 159776, upload-time = "2025-11-28T10:46:30.909Z" },
+    { url = "https://files.pythonhosted.org/packages/04/a5/bc7b62ecea59ecd0208b30b7a363ae13718977705dc2ca079bf58fd43d26/o365-2.1.9-py3-none-any.whl", hash = "sha256:1b792e5fc19086b814415620e92d2e9e89cd7e886163f0715ace1d08a468cbcd", size = 160809, upload-time = "2026-01-30T10:21:13.202Z" },
 ]
 
 [[package]]
