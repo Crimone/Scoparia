@@ -23,7 +23,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiohttp[speedups]>=3.13.5",
     "anyio>=4.12.1",
-    "apprise>=1.9.6",
+    "apprise>=1.10.0",
     "beautifulsoup4[lxml]>=4.14.3",
     "feedparser>=6.0.12",
     "githubkit>=0.15.4",
