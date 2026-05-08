@@ -745,7 +745,7 @@ wheels = [
 
 [[package]]
 name = "githubkit"
-version = "0.15.4"
+version = "0.15.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -754,9 +754,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/14/b020706ac1aa98ecf0d48b3e3cfc91ab66ddb9d5d6ca8951eb343c20fbcf/githubkit-0.15.4.tar.gz", hash = "sha256:5eabc16fca57bfecfa93a9cb18cc5b5ea70fbdb832936f44c0c2007a23c40e09", size = 5452628, upload-time = "2026-04-19T12:14:39.48Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/ac/857b78d82bf95a91413322614d6751db2f55ab214b24239f31729d8821e6/githubkit-0.15.5.tar.gz", hash = "sha256:5ee487b77d3f4332c73fe5dbc69f932d8012ff0bb1aa9c544c238aef74ef1ae0", size = 5550333, upload-time = "2026-05-01T08:57:12.016Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/a4/7e17bfc97a2223389be46e4a377046036c46f7f403119cb5952c3ad04bef/githubkit-0.15.4-py3-none-any.whl", hash = "sha256:3f30bed2175b7e1b7016d6bc42e8571f6d3989ed2707ef74047aede55199b451", size = 13217568, upload-time = "2026-04-19T12:14:35.259Z" },
+    { url = "https://files.pythonhosted.org/packages/76/ed/d08de6b425a6cce4554ea70a559e03d545058881b5b1d2d0a193d886d3a8/githubkit-0.15.5-py3-none-any.whl", hash = "sha256:69934fdce7e4f197f24d85ea91d808ef245f4463bb982e4c19ac32d827bc7a40", size = 13436716, upload-time = "2026-05-01T08:57:07.644Z" },
 ]
 
 [[package]]
@@ -1825,7 +1825,7 @@ requires-dist = [
     { name = "apprise", specifier = ">=1.10.0" },
     { name = "beautifulsoup4", extras = ["lxml"], specifier = ">=4.14.3" },
     { name = "feedparser", specifier = ">=6.0.12" },
-    { name = "githubkit", specifier = ">=0.15.4" },
+    { name = "githubkit", specifier = ">=0.15.5" },
     { name = "html2text", specifier = ">=2025.4.15" },
     { name = "msgspec", extras = ["yaml"], specifier = ">=0.21.1" },
     { name = "o365", specifier = ">=2.1.8" },
