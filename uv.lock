@@ -1836,7 +1836,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", extras = ["speedups"], specifier = ">=3.13.5" },
+    { name = "aiohttp", extras = ["speedups"], specifier = ">=3.14.0" },
     { name = "anyio", specifier = ">=4.12.1" },
     { name = "apprise", specifier = ">=1.10.0" },
     { name = "beautifulsoup4", extras = ["lxml"], specifier = ">=4.14.3" },
