@@ -24,7 +24,11 @@ class MongoDBClient:
         Args:
             mongodb_uri: MongoDB connection URI.
         """
-        self.client = AsyncMongoClient(mongodb_uri)
+        self.client = AsyncMongoClient(
+            mongodb_uri,
+            serverSelectionTimeoutMS=60000,  # Increase server selection timeout to 60s
+            connectTimeoutMS=40000,  # Increase connect timeout to 40s
+        )
         self.db = self.client[DB_NAME]
 
     async def close(self) -> None:

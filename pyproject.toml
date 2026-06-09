@@ -7,12 +7,11 @@ name = "scoparia"
 version = "0.0.1"
 description = "SCP Forum Activity Notifier"
 readme = "README.md"
-license = { text = "AGPL-3.0-or-later" }
+license = "AGPL-3.0-or-later"
 authors = [{ name = "Crimone" }]
 keywords = ["scp", "wikidot", "notification", "github-actions"]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -54,7 +53,7 @@ dev = ["ruff>=0.15.16", "pytest>=9.0.1", "pytest-mock>=3.15.1"]
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "UP", "B", "SIM", "I", "C90"]
+select = ["E", "F", "UP", "B", "SIM", "I", "C90", "PLC0415", "TID"]
 
 [tool.pyright]
 include = ["src"]

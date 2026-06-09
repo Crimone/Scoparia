@@ -11,6 +11,7 @@ from scoparia.formatter import (
     MarkdownFormatter,
     QQPushFormatter,
     TextFormatter,
+    _truncate_html_safe,
     generate_formatter,
 )
 
@@ -396,16 +397,12 @@ class TestTruncateHTMLSafe:
 
     def test_truncate_short_html(self) -> None:
         """Test that short HTML is not truncated."""
-        from scoparia.formatter import _truncate_html_safe
-
         html = "<p>Short content</p>"
         result = _truncate_html_safe(html, max_length=200)
         assert result == html
 
     def test_truncate_long_html(self) -> None:
         """Test that long HTML is truncated safely."""
-        from scoparia.formatter import _truncate_html_safe
-
         html = "<p>" + "x" * 300 + "</p>"
         result = _truncate_html_safe(html, max_length=200)
         assert len(result) < len(html)  # Should be shorter than original
@@ -413,16 +410,12 @@ class TestTruncateHTMLSafe:
 
     def test_truncate_empty_html(self) -> None:
         """Test that empty HTML is handled correctly."""
-        from scoparia.formatter import _truncate_html_safe
-
         html = ""
         result = _truncate_html_safe(html, max_length=200)
         assert result == html
 
     def test_truncate_html_with_tags(self) -> None:
         """Test that HTML with tags is truncated at safe position."""
-        from scoparia.formatter import _truncate_html_safe
-
         html = "<p>Test content with <strong>bold</strong> text and more content</p>"
         result = _truncate_html_safe(html, max_length=20)
         assert len(result) < len(html)  # Should be shorter than original

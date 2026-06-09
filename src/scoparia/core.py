@@ -496,8 +496,8 @@ class ScopariaCore:
                 e,
                 exc_info=True,
             )
-            # Send error notification to admin user (ID: 6207446)
-            await self._send_error_to_admin(str(e))
+            # Send error notification to admin user
+            # await self._send_error_to_admin(str(e))
 
     async def _send_error_to_admin(self, error_message: str) -> None:
         """Send error notification to admin via all enabled channels.

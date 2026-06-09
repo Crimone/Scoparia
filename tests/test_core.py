@@ -281,6 +281,7 @@ class TestScopariaCore:
             call_args = mock_send_email.call_args
             assert call_args.kwargs["to_email"] == "contact@example.com"
 
+    @pytest.mark.skip(reason="Admin notification temporarily disabled")
     async def test_send_email_notification_error_notifies_admin(
         self, core: ScopariaCore, sample_users: dict[int, UserInfo]
     ) -> None:

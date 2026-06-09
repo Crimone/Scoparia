@@ -4,12 +4,14 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from bs4 import BeautifulSoup
 
 from scoparia.api import (
     Contact,
     ForumThread,
     Link,
     NeedsSanitizationError,
+    NoElementException,
     RSSForumPost,
     User,
     UserType,
@@ -247,8 +249,6 @@ class TestForumThreadHelpers:
 
     def test_parse_thread_category(self) -> None:
         """Test _parse_thread_category with valid breadcrumbs."""
-        from bs4 import BeautifulSoup
-
         html = """
         <div class="forum-breadcrumbs">
             <a href="/forum/c-12345/category-name">Test Category</a>
@@ -265,10 +265,6 @@ class TestForumThreadHelpers:
 
     def test_parse_thread_category_missing_link(self) -> None:
         """Test _parse_thread_category raises exception when category link missing."""
-        from bs4 import BeautifulSoup
-
-        from scoparia.api import NoElementException
-
         html = """<div class="forum-breadcrumbs">No category link here</div>"""
         soup = BeautifulSoup(html, "lxml")
         bc_elem = soup.select_one("div.forum-breadcrumbs")
@@ -279,8 +275,6 @@ class TestForumThreadHelpers:
 
     def test_parse_thread_page_fullname(self) -> None:
         """Test _parse_thread_page_fullname with valid description block."""
-        from bs4 import BeautifulSoup
-
         html = """
         <html>
         <div class="description-block">
@@ -296,8 +290,6 @@ class TestForumThreadHelpers:
 
     def test_parse_thread_page_fullname_no_description(self) -> None:
         """Test _parse_thread_page_fullname returns None when no description block."""
-        from bs4 import BeautifulSoup
-
         html = """<html><div>No description block</div></html>"""
         soup = BeautifulSoup(html, "lxml")
 
@@ -310,8 +302,6 @@ class TestParseUserConfigFromPage:
 
     def test_parse_user_config_missing_content(self) -> None:
         """Test that missing content element raises ValueError."""
-        from bs4 import BeautifulSoup
-
         html = """<div class="page"><span class="query_name">test</span></div>"""
         soup = BeautifulSoup(html, "lxml")
         page_elem = soup.select_one("div.page")
@@ -324,8 +314,6 @@ class TestParseUserConfigFromPage:
 
     def test_parse_user_config_invalid_yaml(self) -> None:
         """Test that invalid YAML raises NeedsSanitizationError."""
-        from bs4 import BeautifulSoup
-
         html = """
         <div class="page">
             <span class="query_content">invalid: yaml: content: :</span>
@@ -342,8 +330,6 @@ class TestParseUserConfigFromPage:
 
     def test_parse_user_config_valid(self) -> None:
         """Test parsing valid user config from page element."""
-        from bs4 import BeautifulSoup
-
         html = """
         <div class="page">
             <span class="query_content">
