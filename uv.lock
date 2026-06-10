@@ -1858,7 +1858,7 @@ requires-dist = [
     { name = "aiohttp", extras = ["speedups"], specifier = ">=3.14.0" },
     { name = "anyio", specifier = ">=4.12.1" },
     { name = "apprise", specifier = ">=1.11.0" },
-    { name = "beautifulsoup4", extras = ["lxml"], specifier = ">=4.14.3" },
+    { name = "beautifulsoup4", extras = ["lxml"], specifier = ">=4.15.0" },
     { name = "feedparser", specifier = ">=6.0.12" },
     { name = "githubkit", specifier = ">=0.15.5" },
     { name = "html2text", specifier = ">=2025.4.15" },
