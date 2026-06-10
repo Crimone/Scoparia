@@ -20,7 +20,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "aiohttp[speedups]>=3.14.0",
+    "aiohttp[speedups]>=3.14.1",
     "anyio>=4.12.1",
     "apprise>=1.11.0",
     "beautifulsoup4[lxml]>=4.15.0",
